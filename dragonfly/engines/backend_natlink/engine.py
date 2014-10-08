@@ -65,7 +65,7 @@ class NatlinkEngine(EngineBase):
 
     def connect(self):
         """ Connect to natlink. """
-        self.natlink.natConnect()
+        self.natlink.natConnect(1)
 
     def disconnect(self):
         """ Disconnect from natlink. """

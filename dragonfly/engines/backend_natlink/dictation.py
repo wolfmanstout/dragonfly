@@ -97,7 +97,7 @@ class Word(object):
         else:
             self._info = natlink.getWordInfo(word)
         self._word = word
-        index = word.rfind("\\")
+        index = word.find("\\")
         if index == -1:
             self.written = word
             self.spoken = word
