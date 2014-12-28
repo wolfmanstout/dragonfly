@@ -25,6 +25,7 @@ Main SR engine back-end interface
 """
 
 import logging
+import traceback
 from .base import EngineBase, EngineError, MimicFailure
 
 
@@ -58,6 +59,8 @@ def get_engine(name=None):
             message = ("Exception while initializing natlink engine:"
                        " %s" % (e,))
             log.exception(message)
+            traceback.print_exc()
+            print message
             if name:
                 raise EngineError(message)
 
@@ -74,6 +77,8 @@ def get_engine(name=None):
             message = ("Exception while initializing sapi5 engine:"
                        " %s" % (e,))
             log.exception(message)
+            traceback.print_exc()
+            print message
             if name:
                 raise EngineError(message)
 
@@ -81,3 +86,22 @@ def get_engine(name=None):
         raise EngineError("No usable engines found.")
     else:
         raise EngineError("Requested engine %r not available." % (name,))
+
+
+#---------------------------------------------------------------------------
+
+_default_engine = None
+_engines_by_name = {}
+
+def register_engine_init(engine):
+    """
+        Register initialization of an engine.
+
+        This function sets the default engine to the first engine
+        initialized.
+
+    """
+
+    global _default_engine
+    if not _default_engine:
+        _default_engine = engine

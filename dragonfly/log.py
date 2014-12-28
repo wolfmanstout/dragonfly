@@ -27,14 +27,8 @@ Logging framework
 import sys
 import os.path
 import logging
-import logging
-import win32gui
 from win32com.shell import shell, shellcon
 
-def out(m):
-    pass
-#    logging.getLogger("test").error(m)
-#    print >>sys.stderr, m
 
 #---------------------------------------------------------------------------
 # Sane defaults for logger names and associated levels.
@@ -48,6 +42,7 @@ default_levels = {
                   "":                     (_warning, _warning),
                   "engine":               (_warning, _info), 
                   "engine.compiler":      (_warning, _info), 
+                  "engine.timer":         (_warning, _info),
                   "grammar":              (_warning, _critical), 
                   "grammar.load":         (_warning, _info), 
                   "grammar.begin":        (_info, _info),
