@@ -156,6 +156,7 @@ typeables = {
     "eight":            keyboard.get_typeable(char='8'),
     "9":                keyboard.get_typeable(char='9'),
     "nine":             keyboard.get_typeable(char='9'),
+
     # Symbol keys
     "bang":             keyboard.get_typeable(char='!'),
     "exclamation":      keyboard.get_typeable(char='!'),
