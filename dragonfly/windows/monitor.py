@@ -119,7 +119,7 @@ def _callback(
 
     # Store monitor info.
     handle = long(hMonitor)
-    r = info.rcWork
+    r = info.rcMonitor
     rectangle = Rectangle(r.left, r.top, r.right - r.left, r.bottom - r.top)
     monitor = Monitor(handle, rectangle)
     Monitor._log.debug("Found monitor %s with geometry %s."
