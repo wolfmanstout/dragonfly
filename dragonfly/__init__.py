@@ -34,7 +34,7 @@ from .grammar.rule_mapping       import MappingRule
 from .grammar.elements  import (ElementBase, Sequence, Alternative,
                                 Optional, Repetition, Literal,
                                 ListRef, DictListRef, Dictation,
-                                RuleRef, Empty, Compound, Choice)
+                                RuleRef, RuleWrap, Empty, Compound, Choice)
 from .grammar.context   import Context, AppContext
 from .grammar.list      import ListBase, List, DictList
 from .grammar.recobs    import (RecognitionObserver, RecognitionHistory,
