@@ -119,7 +119,8 @@ def _setup_stdout_handler():
 
     stdout_handler = logging.StreamHandler(_OutputStream(sys.stdout.write))
     stdout_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(name)s: %(message)s")
+    formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
+                                  " %(message)s")
     stdout_handler.setFormatter(formatter)
     return stdout_handler
 

@@ -168,6 +168,13 @@ class ElementBase(object):
         raise NotImplementedError("Call to virtual method gstring()"
                                   " in base class ElementBase")
 
+    def context_phrases(self):
+        context_phrases = []
+        for child in self.children:
+            context_phrases.extend(child.context_phrases())
+        return context_phrases
+
+
     #-----------------------------------------------------------------------
     # Methods for runtime recognition processing.
 
@@ -665,6 +672,10 @@ class Literal(ElementBase):
     def gstring(self):
         return " ".join(self._words)
 
+    def context_phrases(self):
+        return [" ".join(self._words)]
+
+
     #-----------------------------------------------------------------------
     # Methods for runtime recognition processing.
 
@@ -674,7 +685,9 @@ class Literal(ElementBase):
         # Iterate through this element's words.
         # If all match, success.  Else, failure.
         for i in xrange(len(self._words)):
-            if state.word(i) != self._words[i]:
+            state_word = state.word(i)
+            state_word = state_word.lower() if state_word else state_word
+            if state_word != self._words[i].lower():
                 state.decode_failure(self)
                 return
 
@@ -727,6 +740,9 @@ class RuleRef(ElementBase):
 
     def gstring(self):
         return "<" + self._rule.name + ">"
+
+    def context_phrases(self):
+        return self._rule.element.context_phrases()
 
 
     #-----------------------------------------------------------------------
