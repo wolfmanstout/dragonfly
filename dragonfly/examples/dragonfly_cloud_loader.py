@@ -20,9 +20,11 @@ Command-module loader for Google Cloud Speech API.
 """
 
 
+import os
 import os.path
 import logging
 import sys
+import traceback
 
 from dragonfly.engines.backend_google.engine import GoogleSpeechEngine
 import dragonfly.log
@@ -132,7 +134,7 @@ def main():
     engine = GoogleSpeechEngine()
     engine.connect()
 
-    path = r"C:\NatLink\NatLink\MacroSystem"
+    path = r"C:\natlink_commands"
     sys.path.insert(0, path)
     directory = CommandModuleDirectory(path, excludes=[])
     directory.load()
@@ -141,4 +143,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Fix issue where process hangs and is unresponsive to Ctrl-C after
+    # exception is thrown.
+    try:
+        main()
+    except:
+        traceback.print_exc()
+        os._exit(-1)
