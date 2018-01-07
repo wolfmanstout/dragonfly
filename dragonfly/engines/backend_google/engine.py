@@ -10,6 +10,8 @@ from google.cloud.speech import types
 import inflect
 import pyaudio
 from six.moves import queue
+import threading
+import win10toast
 
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
@@ -94,9 +96,15 @@ class GoogleSpeechEngine(EngineBase):
         super(GoogleSpeechEngine, self).__init__()
         self._timer_manager = SimpleTimerManager(0.02, self)
         self._inflect = inflect.engine()
+        self._toaster = win10toast.ToastNotifier()
         self._replacements = {
             r"\b(to|two)\b": ("to", "two"),
+            r"\b(for|four)\b": ("for", "four"),
         }
+
+    def toast(self, title, description):
+        thread = threading.Thread(target=lambda: self._toaster.show_toast(title, description, duration=2))
+        thread.start()
 
     def _get_language(self):
         return "en"
@@ -146,12 +154,12 @@ class GoogleSpeechEngine(EngineBase):
                     return True
         return False
 
-    def generate_transcripts(self, transcript):
+    def generate_transcripts(self, original_transcript):
         """Generates alternative transcripts given a single transcript."""
         generators = [self.generate_number_transcripts]
-        for (pattern, replacement) in self._replacements.items():
-            generators.append(lambda transcript: self.generate_vocabulary_transcripts(transcript, pattern, replacement))
-        transcripts = [transcript]
+        for (pattern, replacements) in self._replacements.items():
+            generators.append(lambda transcript, pattern=pattern, replacements=replacements: self.generate_vocabulary_transcripts(transcript, pattern, replacements))
+        transcripts = [original_transcript]
         for generator in generators:
             new_transcripts = []
             for transcript in transcripts:
@@ -237,12 +245,18 @@ class GoogleSpeechEngine(EngineBase):
                                           window.handle)
                 self._log.debug("Prepared grammar")
                 candidates = self.generate_transcripts(transcript)
+                success = False
                 for candidate in candidates:
                     self._log.debug("Candidate: " + candidate)
                     if self.process_transcript(candidate):
+                        self._log.debug("Succeeded")
+                        # self.toast("Succeeded", candidate)
+                        success = True
                         break
+                if not success:
+                    self._log.debug("Failed")
+                    self.toast("Failed", transcript)
                 processed_transcript = True
-                self._log.debug("Processed transcript")
         return True
 
 
