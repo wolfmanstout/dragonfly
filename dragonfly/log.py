@@ -27,7 +27,10 @@ Logging framework
 import sys
 import os.path
 import logging
-from win32com.shell import shell, shellcon
+try:
+    from win32com.shell import shell, shellcon
+except ImportError:
+    pass
 
 
 #---------------------------------------------------------------------------
@@ -131,8 +134,12 @@ def _setup_file_handler():
     if not _file_handler:
         # Lookup path the user's personal folder in which
         #  to log Dragonfly messages.
-        mydocs_pidl = shell.SHGetFolderLocation(0, shellcon.CSIDL_PERSONAL, 0, 0)
-        mydocs_path = shell.SHGetPathFromIDList(mydocs_pidl)
+        if "shell" in sys.modules:
+            mydocs_pidl = shell.SHGetFolderLocation(0, shellcon.CSIDL_PERSONAL, 0, 0)
+            mydocs_path = shell.SHGetPathFromIDList(mydocs_pidl)
+        else:
+            # Use current working directory.
+            mydocs_path = ""
         log_file_path = os.path.join(mydocs_path, "dragonfly.txt")
         _file_handler = logging.FileHandler(log_file_path)
         formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"

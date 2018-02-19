@@ -2,6 +2,7 @@ from __future__ import division
 
 from collections import Counter
 import re
+import sys
 import threading
 
 from google.cloud import speech
@@ -11,13 +12,20 @@ import inflect
 import pyaudio
 from six.moves import queue
 import threading
-import win10toast
+try:
+    import win10toast
+except ImportError:
+    pass
 
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
 from ...grammar.state import State
-from ...windows.window import Window
+try:
+    from ...windows.window import Window
+except ImportError:
+    # TODO Fix when not using windows.
+    Window = lambda: ("", "", "")
 
 
 # Audio recording parameters
@@ -96,13 +104,15 @@ class GoogleSpeechEngine(EngineBase):
         super(GoogleSpeechEngine, self).__init__()
         self._timer_manager = SimpleTimerManager(0.02, self)
         self._inflect = inflect.engine()
-        self._toaster = win10toast.ToastNotifier()
+        self._toaster = win10toast.ToastNotifier() if "win10toast" in sys.modules else None
         self._replacements = {
             r"\b(to|two)\b": ("to", "two"),
             r"\b(for|four)\b": ("for", "four"),
         }
 
     def toast(self, title, description):
+        if not self._toaster:
+            return
         thread = threading.Thread(target=lambda: self._toaster.show_toast(title, description, duration=2))
         thread.start()
 
