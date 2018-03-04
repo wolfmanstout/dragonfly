@@ -44,6 +44,7 @@ from .grammar.list      import ListBase, List, DictList
 #                                Number, NumberRef)
 
 #---------------------------------------------------------------------------
+from .actions           import (ActionBase, DynStrActionBase, Function, Mimic, Pause, Repeat)
 # from .actions           import (ActionBase, DynStrActionBase, ActionError,
 #                                 Repeat, Key, Text, Mouse, Paste, Pause,
 #                                 Mimic, Playback, WaitWindow, FocusWindow,

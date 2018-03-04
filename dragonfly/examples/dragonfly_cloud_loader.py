@@ -39,7 +39,7 @@ class CommandModule(object):
 
     def __init__(self, path):
         self._path = os.path.abspath(path)
-        self._namespace = None
+        self._namespace = {}
         self._loaded = False
 
     def __str__(self):
@@ -134,8 +134,10 @@ def main():
     engine = GoogleSpeechEngine()
     engine.connect()
 
-    sys.path.insert(0, "C:/NatLink/NatLink/MacroSystem")
-    path = "C:/natlink_commands"
+    # sys.path.insert(0, "C:/NatLink/NatLink/MacroSystem")
+    # path = "C:/natlink_commands"
+    sys.path.insert(0, "/home/jwstout/natlink/NatLink/MacroSystem")
+    path = "/home/jwstout/natlink_commands"
     sys.path.insert(0, path)
     directory = CommandModuleDirectory(path, excludes=[])
     directory.load()

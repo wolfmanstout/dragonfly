@@ -25,7 +25,7 @@ try:
     from ...windows.window import Window
 except ImportError:
     # TODO Fix when not using windows.
-    Window = lambda: ("", "", "")
+    pass
 
 
 # Audio recording parameters
@@ -250,9 +250,10 @@ class GoogleSpeechEngine(EngineBase):
                     print('Exiting..')
                     return False
                 for (_, grammar) in self._grammar_wrappers.items():
-                    window = Window.get_foreground()
-                    grammar.process_begin(window.executable, window.title,
-                                          window.handle)
+                    # window = Window.get_foreground()
+                    # grammar.process_begin(window.executable, window.title,
+                    #                       window.handle)
+                    grammar.process_begin("", "", "")
                 self._log.debug("Prepared grammar")
                 candidates = self.generate_transcripts(transcript)
                 success = False
@@ -296,9 +297,10 @@ class GoogleSpeechEngine(EngineBase):
                 # Add context phrases.
                 context_phrases = Counter()
                 for (_, grammar) in self._grammar_wrappers.items():
-                    window = Window.get_foreground()
-                    grammar.process_begin(window.executable, window.title,
-                                          window.handle)
+                    # window = Window.get_foreground()
+                    # grammar.process_begin(window.executable, window.title,
+                    #                       window.handle)
+                    grammar.process_begin("", "", "")
                     for rule in grammar._rules:
                         if not rule.active or not rule.exported: continue
                         context_phrases.update(rule.element.context_phrases())

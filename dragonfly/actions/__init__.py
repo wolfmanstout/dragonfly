@@ -24,10 +24,10 @@ from .action_base         import (ActionBase, DynStrActionBase,
 # from .action_text         import Text
 # from .action_mouse        import Mouse
 # from .action_paste        import Paste
-# from .action_pause        import Pause
-# from .action_mimic        import Mimic
+from .action_pause        import Pause
+from .action_mimic        import Mimic
 # from .action_playback     import Playback
-# from .action_function     import Function
+from .action_function     import Function
 # from .action_waitwindow   import WaitWindow
 # from .action_focuswindow  import FocusWindow
 # from .action_startapp     import StartApp, BringApp
