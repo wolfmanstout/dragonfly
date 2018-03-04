@@ -57,7 +57,7 @@ class CommandModule(object):
         try:
             execfile(self._path, namespace)
         except Exception, e:
-            self._log.error("%s: Error loading module: %s" % (self, e))
+            self._log.error("%s: Error loading module: %s" % (self, traceback.format_exc()))
             self._loaded = False
             return
 
@@ -134,7 +134,8 @@ def main():
     engine = GoogleSpeechEngine()
     engine.connect()
 
-    path = r"C:\natlink_commands"
+    sys.path.insert(0, "C:/NatLink/NatLink/MacroSystem")
+    path = "C:/natlink_commands"
     sys.path.insert(0, path)
     directory = CommandModuleDirectory(path, excludes=[])
     directory.load()
