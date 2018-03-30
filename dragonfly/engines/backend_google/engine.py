@@ -103,6 +103,7 @@ class GoogleSpeechEngine(EngineBase):
 
     def __init__(self):
         super(GoogleSpeechEngine, self).__init__()
+        self._connected = False
         self._timer_manager = SimpleTimerManager(0.02, self)
         self._inflect = inflect.engine()
         self._toaster = win10toast.ToastNotifier() if "win10toast" in sys.modules else None
@@ -121,7 +122,10 @@ class GoogleSpeechEngine(EngineBase):
         return "en"
 
     def connect(self):
-        pass
+        self._connected = True
+
+    def disconnect(self):
+        self._connected = False
 
     def _load_grammar(self, grammar):
         grammar.engine = self
@@ -288,8 +292,9 @@ class GoogleSpeechEngine(EngineBase):
             single_utterance=True,
         )
 
+        self.connect()
         with MicrophoneStream(RATE, CHUNK) as stream:
-            while True:
+            while self._connected:
                 shutdown_event = threading.Event()
                 audio_generator = stream.generator(shutdown_event)
                 requests = (types.StreamingRecognizeRequest(audio_content=content)
