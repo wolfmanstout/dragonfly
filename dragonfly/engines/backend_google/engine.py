@@ -98,6 +98,7 @@ class MicrophoneStream(object):
 
 class GoogleSpeechEngine(EngineBase):
 
+    _name = "google"
     DictationContainer = GoogleSpeechDictationContainer
 
     def __init__(self):
