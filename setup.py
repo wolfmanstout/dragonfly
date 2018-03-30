@@ -57,7 +57,11 @@ setup(
 
       install_requires=[
                         "setuptools >= 0.6c7",
-                        # "pywin32",
+                        "pywin32;platform_system=='Windows'",
+                        "win10toast;platform_system=='Windows'",
+                        "pyaudio",
+                        "google-cloud-speech",
+                        "inflect"
                        ],
 
       classifiers=[
