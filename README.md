@@ -20,6 +20,39 @@ Dragonfly's mailing list/discussion group is available at
 [Google Groups](https://groups.google.com/forum/#!forum/dragonflyspeech).
 
 
+Google Cloud Speech API
+----------------------------------------------------------------------------
+The Google Cloud Speech API dragonfly engine can be used as an alternative
+to the DNS and WSR engines. It should work on Windows, macOS and Linux
+through [Aenea](https://github.com/dictation-toolbox/aenea).
+
+In order to use the engine, you will need to [install the Google Cloud SDK](https://cloud.google.com/sdk/)
+and then [obtain application credentials](https://googlecloudplatform.github.io/google-cloud-python/latest/core/auth.html)
+using:
+``` Shell
+gcloud auth application-default login
+```
+
+To install *dragonfly* and the dependencies for the engine use the following:
+``` Shell
+python setup.py install
+```
+
+You may need to
+[install the Python headers](https://stackoverflow.com/questions/21530577/fatal-error-python-h-no-such-file-or-directory)
+if `Python.h` cannot be found.
+
+You'll then need to copy the *dragonfly_cloud_loader.py* script from
+*dragonfly/examples* into the folder containing your grammar modules and run
+it using:
+``` Shell
+python dragonfly_cloud_loader.py
+```
+
+This is the equivalent to the *MacroSystem/Core* directory that NatLink uses
+to load grammar modules.
+
+
 Features
 ----------------------------------------------------------------------------
 
