@@ -29,8 +29,13 @@ import os.path
 import logging
 try:
     from win32com.shell import shell, shellcon
-except ImportError:
-    pass
+except ImportError, error:
+    import sys
+    if sys.platform.startswith("win"):
+        raise error
+    shell = None
+    shellcon = None
+    
 
 
 #---------------------------------------------------------------------------
@@ -134,7 +139,7 @@ def _setup_file_handler():
     if not _file_handler:
         # Lookup path the user's personal folder in which
         #  to log Dragonfly messages.
-        if "shell" in sys.modules:
+        if shell:
             mydocs_pidl = shell.SHGetFolderLocation(0, shellcon.CSIDL_PERSONAL, 0, 0)
             mydocs_path = shell.SHGetPathFromIDList(mydocs_pidl)
         else:
