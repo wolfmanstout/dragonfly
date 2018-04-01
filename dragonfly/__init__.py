@@ -48,9 +48,13 @@ from .grammar.recobs    import (RecognitionObserver, RecognitionHistory,
 #---------------------------------------------------------------------------
 
 from .actions           import (ActionBase, DynStrActionBase, ActionError,
-                                 Repeat, Key, Text, Mouse, Paste, Pause,
-                                 Mimic, Playback, WaitWindow, FocusWindow,
-                                 Function, StartApp, BringApp, PlaySound)
+                                Repeat, Key, Text, Mouse, Paste, Pause,
+                                Mimic, Playback, WaitWindow, FocusWindow,
+                                Function, StartApp, BringApp, PlaySound,
+                                Typeable, Keyboard, typeables,
+                                KeyboardInput, MouseInput, HardwareInput,
+                                make_input_array, send_input_array
+                                )
 
 #---------------------------------------------------------------------------
 
