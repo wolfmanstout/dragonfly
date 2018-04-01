@@ -27,3 +27,37 @@ SR back-end package for Google Cloud Speech API.
 import logging
 _log = logging.getLogger("engine.google")
 
+#---------------------------------------------------------------------------
+
+# Module level singleton instance of this engine implementation.
+_engine = None
+
+
+def is_engine_available():
+    """ Check whether Google engine is available. """
+    global _engine
+    if _engine:
+        return True
+
+    # Attempt to import dependencies.
+    try:
+        import google.cloud.speech
+        import inflect
+        import pyaudio
+    except ImportError as e:
+        _log.info("Failed to import dependency package: %s" % (e,))
+        return False
+    except Exception as e:
+        _log.exception("Exception during import of engine dependencies: %s" % (e,))
+        return False
+
+    return True
+
+
+def get_engine():
+    """ Retrieve the Google back-end engine object. """
+    global _engine
+    if not _engine:
+        from .engine import GoogleSpeechEngine
+        _engine = GoogleSpeechEngine()
+    return _engine

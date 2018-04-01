@@ -22,9 +22,23 @@
     This file implements the ConnectionGrammar class.
 """
 
+try:
+    from win32com.client import Dispatch
+    from pywintypes import com_error
+except ImportError, error:
+    import sys
+    if sys.platform.startswith("win"):
+        raise error
 
-from win32com.client import Dispatch
-from pywintypes import com_error
+    # These modules aren't available on non-Windows platforms, so mock what is used.
+    class COMError(Exception):
+        pass
+
+    com_error = COMError
+
+    class Dispatch(object):
+        def __init__(self, _):
+            pass
 
 from dragonfly.grammar.grammar_base import Grammar
 
