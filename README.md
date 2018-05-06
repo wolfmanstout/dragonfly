@@ -22,18 +22,24 @@ Dragonfly's mailing list/discussion group is available at
 
 Google Cloud Speech API
 ----------------------------------------------------------------------------
-The Google Cloud Speech API dragonfly engine can be used as an alternative
-to the DNS and WSR engines. It should work on Windows, macOS and Linux
-through [Aenea](https://github.com/dictation-toolbox/aenea).
+The Google Cloud Speech API dragonfly engine can be used as an
+alternative to the DNS and WSR engines. It should work on Windows,
+macOS and Linux through
+[Aenea](https://github.com/dictation-toolbox/aenea).
 
-In order to use the engine, you will need to [install the Google Cloud SDK](https://cloud.google.com/sdk/)
-and then [obtain application credentials](https://googlecloudplatform.github.io/google-cloud-python/latest/core/auth.html)
+In order to use the engine, you will need to [install the Google Cloud
+SDK](https://cloud.google.com/sdk/) and then [obtain application
+credentials](https://googlecloudplatform.github.io/google-cloud-python/latest/core/auth.html)
 using:
+
 ``` Shell
 gcloud auth application-default login
 ```
 
-To install *dragonfly* and the dependencies for the engine use the following:
+To install *dragonfly* and the dependencies for the engine use the
+following (substituting `develop` for `install` if you wish the
+installation to be symlinked to your repository):
+
 ``` Shell
 python setup.py install
 ```
@@ -42,17 +48,19 @@ You may need to
 [install the Python headers](https://stackoverflow.com/questions/21530577/fatal-error-python-h-no-such-file-or-directory)
 if `Python.h` cannot be found.
 
-Next, clone [my fork of Aenea](https://github.com/wolfmanstout/aenea) and add
-the `client` directory to your PYTHONPATH. Configure aenea.json in your grammar
-directory per the Aenea readme. To use native Windows dragonfly contexts and
-actions, set platform to "native". To use with an Aenea server (e.g. on Linux),
-set platform to "proxy" and configure and run the server.
+Next, clone [my fork of Aenea](https://github.com/wolfmanstout/aenea)
+and add the `client` directory to your PYTHONPATH. Configure
+aenea.json in your grammar directory per the Aenea readme. To use
+native Windows dragonfly contexts and actions, set platform to
+"native". To use with an Aenea server (e.g. on Linux), set platform to
+"proxy" and configure and run the server following the Aenea readme.
 
 Set the environment variable DRAGONFLY_USER_DIRECTORY to your grammar
-directory. This will be used both to find grammars and to find aenea.json in my
-fork of Aenea.
+directory. This will be used both to find grammars and to find
+aenea.json in my fork of Aenea.
 
 Finally, run the script to start listening for commands:
+
 ``` Shell
 python dragonfly/examples/dragonfly_cloud_loader.py
 ```
