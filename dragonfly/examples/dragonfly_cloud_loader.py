@@ -134,8 +134,10 @@ def main():
     engine = GoogleSpeechEngine()
     engine.connect()
 
-    # path = "C:/natlink_commands"
-    path = "/home/jwstout/natlink_commands"
+    if "DRAGONFLY_USER_DIRECTORY" in os.environ:
+        path = os.environ["DRAGONFLY_USER_DIRECTORY"]
+    else:
+        path = ""
     sys.path.insert(0, path)
     directory = CommandModuleDirectory(path, excludes=[])
     directory.load()

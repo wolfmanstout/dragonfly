@@ -42,23 +42,20 @@ You may need to
 [install the Python headers](https://stackoverflow.com/questions/21530577/fatal-error-python-h-no-such-file-or-directory)
 if `Python.h` cannot be found.
 
-Next, clone [Aenea](https://github.com/dictation-toolbox/aenea) and add the
-`client` directory to your PYTHONPATH. Configure aenea.json in your grammar
+Next, clone [my fork of Aenea](https://github.com/wolfmanstout/aenea) and add
+the `client` directory to your PYTHONPATH. Configure aenea.json in your grammar
 directory per the Aenea readme. To use native Windows dragonfly contexts and
 actions, set platform to "native". To use with an Aenea server (e.g. on Linux),
-set platform to "proxy" and configure and run the server. If the default
-aenea.json location doesn't work (e.g. on Linux or Mac), set
-STARTING_PROJECT_ROOT in `client/aenea/config.py` appropriately.
+set platform to "proxy" and configure and run the server.
 
-You'll then need to copy the *dragonfly_cloud_loader.py* script from
-*dragonfly/examples* into the folder containing your grammar modules and run
-it using:
+Set the environment variable DRAGONFLY_USER_DIRECTORY to your grammar
+directory. This will be used both to find grammars and to find aenea.json in my
+fork of Aenea.
+
+Finally, run the script to start listening for commands:
 ``` Shell
-python dragonfly_cloud_loader.py
+python dragonfly/examples/dragonfly_cloud_loader.py
 ```
-
-This is the equivalent to the *MacroSystem/Core* directory that NatLink uses
-to load grammar modules.
 
 
 Features
