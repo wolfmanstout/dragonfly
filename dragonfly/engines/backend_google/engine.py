@@ -5,6 +5,8 @@ import re
 import sys
 import threading
 
+import aenea.config
+import aenea.proxy_contexts
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
@@ -232,6 +234,16 @@ class GoogleSpeechEngine(EngineBase):
         return "".join(result.alternatives[0].transcript for result in response.results)
 
 
+    def get_foreground(self):
+        """Gets the foreground window information a cross-platform way using Aenea."""
+        if aenea.config.proxy_active():
+            context = aenea.proxy_contexts._get_context()
+            return dict(title=context["title"], executable=context["executable"], handle="")
+        else:
+            window = Window.get_foreground()
+            return dict(title=window.title, executable=window.executable, handle=window.handle)
+
+
     def process_responses(self, responses, shutdown_event):
         processed_transcript = False
         for response in responses:
@@ -255,10 +267,8 @@ class GoogleSpeechEngine(EngineBase):
                     print('Exiting..')
                     return False
                 for (_, grammar) in self._grammar_wrappers.items():
-                    # window = Window.get_foreground()
-                    # grammar.process_begin(window.executable, window.title,
-                    #                       window.handle)
-                    grammar.process_begin("", "", "")
+                    context = self.get_foreground()
+                    grammar.process_begin(**context)
                 self._log.debug("Prepared grammar")
                 candidates = self.generate_transcripts(transcript)
                 success = False
