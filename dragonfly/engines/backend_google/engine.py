@@ -1,9 +1,11 @@
 from __future__ import division
 
 from collections import Counter
+from collections import deque
 import re
 import sys
 import threading
+import time
 
 import aenea.config
 import aenea.proxy_contexts
@@ -33,6 +35,12 @@ except ImportError:
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
+CHUNK_TIME = 0.1
+
+class Chunk(object):
+    def __init__(self, data, end_time):
+        self.data = data
+        self.end_time = end_time
 
 
 class MicrophoneStream(object):
@@ -43,7 +51,9 @@ class MicrophoneStream(object):
 
         # Create a thread-safe buffer of audio data
         self._buff = queue.Queue()
+        self._backlog = deque()
         self._closed = True
+        self.last_start_time = None
 
     def __enter__(self):
         self._audio_interface = pyaudio.PyAudio()
@@ -72,10 +82,20 @@ class MicrophoneStream(object):
 
     def _fill_buffer(self, in_data, frame_count, time_info, status_flags):
         """Continuously collect data from the audio stream, into the buffer."""
-        self._buff.put(in_data)
+        self._buff.put(Chunk(in_data, time.time()))
         return None, pyaudio.paContinue
 
-    def generator(self, shutdown_event):
+    def generator(self, start_time, shutdown_event):
+        self.last_start_time = None
+        while len(self._backlog) > 0:
+            chunk = self._backlog[0]
+            if start_time and chunk.end_time - CHUNK_TIME > start_time:
+                break
+            self._backlog.popleft()
+        if len(self._backlog) > 0:
+            self.last_start_time = self._backlog[0].end_time - CHUNK_TIME
+            yield b''.join(chunk.data for chunk in self._backlog)
+
         while not self._closed and not shutdown_event.is_set():
             # Use a blocking get() to ensure there's at least one chunk of
             # data, and stop iteration if the chunk is None, indicating the
@@ -83,7 +103,10 @@ class MicrophoneStream(object):
             chunk = self._buff.get()
             if chunk is None:
                 return
-            data = [chunk]
+            data = [chunk.data]
+            if not self.last_start_time:
+                self.last_start_time = chunk.end_time - CHUNK_TIME
+            self._backlog.append(chunk)
 
             # Now consume whatever other data's still buffered.
             while True:
@@ -91,7 +114,10 @@ class MicrophoneStream(object):
                     chunk = self._buff.get(block=False)
                     if chunk is None:
                         return
-                    data.append(chunk)
+                    data.append(chunk.data)
+                    if not self.last_start_time:
+                        self.last_start_time = chunk.end_time - CHUNK_TIME
+                    self._backlog.append(chunk)
                 except queue.Empty:
                     break
 
@@ -106,6 +132,7 @@ class GoogleSpeechEngine(EngineBase):
     def __init__(self):
         super(GoogleSpeechEngine, self).__init__()
         self._connected = False
+        self._latest_processed_offset = None
         self._timer_manager = SimpleTimerManager(0.02, self)
         self._inflect = inflect.engine()
         self._toaster = win10toast.ToastNotifier() if "win10toast" in sys.modules else None
@@ -243,11 +270,24 @@ class GoogleSpeechEngine(EngineBase):
             window = Window.get_foreground()
             return dict(title=window.title, executable=window.executable, handle=window.handle)
 
+    def get_latest_processed_offset(self, response):
+        latest_processed_offset = 0.0
+        for result in response.results:
+            words = result.alternatives[0].words
+            if len(words) > 0:
+                last_duration = words[-1].end_time
+                latest_processed_offset = max(latest_processed_offset, last_duration.seconds + last_duration.nanos * 1e-9)
+        return latest_processed_offset if latest_processed_offset > 0.0 else None
 
     def process_responses(self, responses, shutdown_event):
+        self._latest_processed_offset = None
         processed_transcript = False
         for response in responses:
+            self._log.debug("Offset: %s" % self.get_latest_processed_offset(response))
             if processed_transcript:
+                transcript = self.get_stable_transcript(response)
+                if transcript:
+                    self._log.debug("Transcript past end: " + transcript)
                 continue
             if response.speech_event_type == enums.StreamingRecognizeResponse.SpeechEventType.END_OF_SINGLE_UTTERANCE:
                 self._log.debug("End of utterance")
@@ -258,6 +298,7 @@ class GoogleSpeechEngine(EngineBase):
 
             transcript = self.get_stable_transcript(response)
             if transcript:
+                self._latest_processed_offset = self.get_latest_processed_offset(response)
                 # Shut down this request so that new audio is buffered for the next request.
                 shutdown_event.set()
                 self._log.debug("Transcript: " + transcript)
@@ -295,7 +336,9 @@ class GoogleSpeechEngine(EngineBase):
         config = types.RecognitionConfig(
             encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=RATE,
-            language_code=language_code)
+            language_code=language_code,
+            enable_word_time_offsets=True,
+        )
         streaming_config = types.StreamingRecognitionConfig(
             config=config,
             interim_results=True,
@@ -305,8 +348,14 @@ class GoogleSpeechEngine(EngineBase):
         self.connect()
         with MicrophoneStream(RATE, CHUNK) as stream:
             while self._connected:
+                if self._latest_processed_offset:
+                    assert stream.last_start_time
+                    latest_processed_time = stream.last_start_time + self._latest_processed_offset
+                else:
+                    latest_processed_time = 0.0
+                self._log.debug("latest_processed_time: %.2f" % latest_processed_time)
                 shutdown_event = threading.Event()
-                audio_generator = stream.generator(shutdown_event)
+                audio_generator = stream.generator(latest_processed_time, shutdown_event)
                 requests = (types.StreamingRecognizeRequest(audio_content=content)
                             for content in audio_generator)
 
@@ -334,4 +383,3 @@ class GoogleSpeechEngine(EngineBase):
                 # Now, put the transcription responses to use.
                 if not self.process_responses(responses, shutdown_event):
                     return
-
