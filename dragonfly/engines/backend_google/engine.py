@@ -7,18 +7,19 @@ import threading
 
 import aenea.config
 import aenea.proxy_contexts
+import aenea.proxy_actions
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
 import inflect
 import pyaudio
 from six.moves import queue
-import threading
 try:
     import win10toast
 except ImportError:
     pass
 
+from ...a11y.atspi import ConnectA11yController
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
@@ -280,6 +281,14 @@ class GoogleSpeechEngine(EngineBase):
                         success = True
                         break
                 if not success:
+                    # Dictate into editable text widget.
+                    focused_object = self._controller.get_focused_object()
+                    if focused_object and focused_object.is_editable():
+                        # TODO escape
+                        aenea.proxy_actions.ProxyText(transcript).execute()
+                        self._log.debug("Entered text into editable")
+                        success = True
+                if not success:
                     self._log.debug("Failed")
                     self.toast("Failed", transcript)
                 processed_transcript = True
@@ -303,35 +312,36 @@ class GoogleSpeechEngine(EngineBase):
         )
 
         self.connect()
-        with MicrophoneStream(RATE, CHUNK) as stream:
-            while self._connected:
-                shutdown_event = threading.Event()
-                audio_generator = stream.generator(shutdown_event)
-                requests = (types.StreamingRecognizeRequest(audio_content=content)
-                            for content in audio_generator)
+        with ConnectA11yController() as controller:
+            self._controller = controller
+            with MicrophoneStream(RATE, CHUNK) as stream:
+                while self._connected:
+                    shutdown_event = threading.Event()
+                    audio_generator = stream.generator(shutdown_event)
+                    requests = (types.StreamingRecognizeRequest(audio_content=content)
+                                for content in audio_generator)
 
-                # Add context phrases.
-                context_phrases = Counter()
-                for (_, grammar) in self._grammar_wrappers.items():
-                    # window = Window.get_foreground()
-                    # grammar.process_begin(window.executable, window.title,
-                    #                       window.handle)
-                    grammar.process_begin("", "", "")
-                    for rule in grammar._rules:
-                        if not rule.active or not rule.exported: continue
-                        context_phrases.update(rule.element.context_phrases())
-                config = streaming_config.config
-                del config.speech_contexts[:]
-                speech_context = config.speech_contexts.add()
-                self._log.debug("Total phrases: %s", len(context_phrases))
-                # The API currently restricts to max 500 phrases as of 11/4/2017.
-                speech_context.phrases.extend(
-                    sorted(w for w, c in context_phrases.most_common(500)))
-                # self._log.debug("Phrases: %s", speech_context.phrases)
+                    # Add context phrases.
+                    context_phrases = Counter()
+                    for (_, grammar) in self._grammar_wrappers.items():
+                        # window = Window.get_foreground()
+                        # grammar.process_begin(window.executable, window.title,
+                        #                       window.handle)
+                        grammar.process_begin("", "", "")
+                        for rule in grammar._rules:
+                            if not rule.active or not rule.exported: continue
+                            context_phrases.update(rule.element.context_phrases())
+                    config = streaming_config.config
+                    del config.speech_contexts[:]
+                    speech_context = config.speech_contexts.add()
+                    self._log.debug("Total phrases: %s", len(context_phrases))
+                    # The API currently restricts to max 500 phrases as of 11/4/2017.
+                    speech_context.phrases.extend(
+                        sorted(w for w, c in context_phrases.most_common(500)))
+                    # self._log.debug("Phrases: %s", speech_context.phrases)
 
-                responses = client.streaming_recognize(streaming_config, requests)
+                    responses = client.streaming_recognize(streaming_config, requests)
 
-                # Now, put the transcription responses to use.
-                if not self.process_responses(responses, shutdown_event):
-                    return
-
+                    # Now, put the transcription responses to use.
+                    if not self.process_responses(responses, shutdown_event):
+                        return
