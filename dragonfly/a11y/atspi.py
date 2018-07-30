@@ -1,19 +1,12 @@
-from contextlib import contextmanager
 import threading
 
 import pyatspi
-
-@contextmanager
-def ConnectA11yController():
-    controller = AtspiController()
-    controller.start()
-    yield controller
-    controller.stop()
 
 class AtspiController(object):
     def __init__(self):
         self._focused = None
         def update_focus(event):
+            # TODO Add concurrency control.
             self._focused = AtspiObject(event.source)
         pyatspi.Registry.registerEventListener(update_focus,
                                                "object:state-changed:focused")
@@ -23,6 +16,9 @@ class AtspiController(object):
         thread.start()
 
     def stop(self):
+        # TODO this is supposed to be called within an event handler in the GLib
+        # main loop. Set up a way to send these using something similar to this:
+        # https://github.com/GNOME/pyatspi2/blob/master/pyatspi/registry.py#L148
         pyatspi.Registry.stop()
 
     def get_focused_object(self):

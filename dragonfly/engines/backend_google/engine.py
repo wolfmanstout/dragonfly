@@ -8,6 +8,7 @@ import threading
 import aenea.config
 import aenea.proxy_contexts
 import aenea.proxy_actions
+import aenea.strict
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
@@ -19,7 +20,7 @@ try:
 except ImportError:
     pass
 
-from ...a11y.atspi import ConnectA11yController
+from ...a11y import ConnectA11yController
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
@@ -284,8 +285,8 @@ class GoogleSpeechEngine(EngineBase):
                     # Dictate into editable text widget.
                     focused_object = self._controller.get_focused_object()
                     if focused_object and focused_object.is_editable():
-                        # TODO escape
-                        aenea.proxy_actions.ProxyText(transcript).execute()
+                        # TODO Escape transcript.
+                        aenea.strict.Text(transcript).execute()
                         self._log.debug("Entered text into editable")
                         success = True
                 if not success:
