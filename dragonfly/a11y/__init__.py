@@ -3,15 +3,24 @@ from contextlib import contextmanager
 
 if sys.platform.startswith("win"):
     from . import ia2
-    controller_class = ia2.Pyia2Controller
+    controller_class = ia2.Controller
 else:
     # TODO check if Linux.
     from . import atspi
-    controller_class = atspi.AtspiController
+    controller_class = atspi.Controller
 
+controller = None
+
+def GetA11yController():
+    global controller
+    if not controller:
+        controller = controller_class()
+        controller.start()
+    return controller
+
+# TODO Rethink ownership model.
 @contextmanager
 def ConnectA11yController():
-    controller = controller_class()
-    controller.start()
+    controller = GetA11yController()
     yield controller
     controller.stop()

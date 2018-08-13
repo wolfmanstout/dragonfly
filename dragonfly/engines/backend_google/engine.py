@@ -265,7 +265,7 @@ class GoogleSpeechEngine(EngineBase):
                 self._log.debug("Transcript: " + transcript)
                 # Exit recognition if any of the transcribed phrases could be
                 # one of our keywords.
-                if re.match(r"\s*quit dragonfly\s*", transcript, re.I):
+                if re.match(r"\s*dragonfly close now\s*", transcript, re.I):
                     print('Exiting..')
                     return False
                 for (_, grammar) in self._grammar_wrappers.items():
@@ -283,8 +283,8 @@ class GoogleSpeechEngine(EngineBase):
                         break
                 if not success:
                     # Dictate into editable text widget.
-                    focused_object = self._controller.get_focused_object()
-                    if focused_object and focused_object.is_editable():
+                    focused = self._controller.get_focused()
+                    if focused and focused.is_editable():
                         # TODO Escape transcript.
                         aenea.strict.Text(transcript).execute()
                         self._log.debug("Entered text into editable")

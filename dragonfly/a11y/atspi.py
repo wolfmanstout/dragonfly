@@ -2,12 +2,12 @@ import threading
 
 import pyatspi
 
-class AtspiController(object):
+class Controller(object):
     def __init__(self):
         self._focused = None
         def update_focus(event):
             # TODO Add concurrency control.
-            self._focused = AtspiObject(event.source)
+            self._focused = Accessible(event.source)
         pyatspi.Registry.registerEventListener(update_focus,
                                                "object:state-changed:focused")
 
@@ -21,18 +21,18 @@ class AtspiController(object):
         # https://github.com/GNOME/pyatspi2/blob/master/pyatspi/registry.py#L148
         pyatspi.Registry.stop()
 
-    def get_focused_object(self):
+    def get_focused(self):
         return self._focused
 
-class AtspiObject(object):
-    def __init__(self, object):
-        self._object = object
+class Accessible(object):
+    def __init__(self, accessible):
+        self._accessible = accessible
 
     def is_editable(self):
-        if pyatspi.state.STATE_EDITABLE not in self._object.getState().getStates():
+        if pyatspi.state.STATE_EDITABLE not in self._accessible.getState().getStates():
             return False
         try:
-            self._object.queryEditableText()
+            self._accessible.queryEditableText()
         except NotImplementedError:
             return False
         return True
