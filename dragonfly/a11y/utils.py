@@ -19,6 +19,27 @@ def move_cursor(controller, phrase, before=False):
             print "Not found: %s" % phrase
     controller.run_sync(closure)
 
+def select_text(controller, phrase):
+    print "Selecting text: %s" % phrase
+    def closure(context):
+        if not context.focused:
+            print "Nothing is focused."
+            return
+        accessible_text = context.focused.as_text()
+        regex = r"[^A-Za-z]*".join(re.escape(word) for word in re.split(r"[^A-Za-z]+", phrase))
+        matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
+        ranges = [(match.start(), match.end())
+                  for match in matches]
+        if len(ranges) > 0:
+            # TODO Choose selection nearest to cursor location.
+            accessible_text.clear_selection()
+            accessible_text.select_range(*ranges[0])
+            print "Selected text"
+        else:
+            print "Not found: %s" % phrase
+    controller.run_sync(closure)
+    
+
 def is_editable_focused(controller):
     def closure(context):
         return context.focused and context.focused.is_editable()

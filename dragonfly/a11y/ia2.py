@@ -20,7 +20,8 @@ class Controller(object):
     def _start_blocking(self):
         # Import here so that it can be used in a background thread. The import
         # must be run in the same thread as event registration and handling.
-        global pyia2
+        global comtypes, pyia2
+        import comtypes
         import pyia2
 
         # Register event listeners.
@@ -104,9 +105,9 @@ class AccessibleTextNode(object):
         expanded_text_pieces = []
         child_indices = [i for i, c in enumerate(text) if c == u"\ufffc"]
         if len(child_indices) == 0:
-            self._add_leaf(0, text_length, text, expanded_text_pieces, True)
+            self._add_leaf(0, text_length, text, expanded_text_pieces)
         elif child_indices[0] > 0:
-            self._add_leaf(0, child_indices[0], text, expanded_text_pieces, False)
+            self._add_leaf(0, child_indices[0], text, expanded_text_pieces)
         for i, child_index in enumerate(child_indices):
             # TODO Handle case where all embedded objects are non-text and this interface is not supported.
             hypertext = self._text.QueryInterface(pyia2.IA2Lib.IAccessibleHypertext)
@@ -119,11 +120,11 @@ class AccessibleTextNode(object):
             expanded_text_pieces.append(child_node.expanded_text)
             end_index = child_indices[i + 1] if i < len(child_indices) - 1 else text_length
             if end_index > child_index + 1:
-                self._add_leaf(child_index + 1, end_index, text, expanded_text_pieces, i == len(child_indices) - 1)
+                self._add_leaf(child_index + 1, end_index, text, expanded_text_pieces)
         self.expanded_text = "".join(expanded_text_pieces)
     
-    def _add_leaf(self, start, end, text, expanded_text_pieces, is_last):
-        child = AccessibleTextLeaf(self._text, text, start, end, is_last)
+    def _add_leaf(self, start, end, text, expanded_text_pieces):
+        child = AccessibleTextLeaf(self._text, text, start, end)
         self._children.append(child)
         expanded_text_pieces.append(child.expanded_text)
 
@@ -141,14 +142,29 @@ class AccessibleTextNode(object):
         pass
         # TODO Implement.
 
+    def select_range(self, start, end):
+        for child in self._children:
+            if start < len(child.expanded_text):
+                child.select_range(start if start >= 0 else 0,
+                                   end if end < len(child.expanded_text) else len(child.expanded_text) - 1)
+            if end < len(child.expanded_text):
+                return
+            start -= len(child.expanded_text)
+            end -= len(child.expanded_text)
+
+    def clear_selection(self):
+        self._text.setSelection(0, 0, 0)
+        self._text.removeSelection(0)
+        for child in self._children:
+            child.clear_selection()
+
+
 class AccessibleTextLeaf(object):
     DELIMITER = "\x1e"
 
-    def __init__(self, accessible_text, text, start, end, is_last):
+    def __init__(self, accessible_text, text, start, end):
         self._text = accessible_text
-        self.expanded_text = text[start:end]
-        if is_last:
-            self.expanded_text += self.DELIMITER
+        self.expanded_text = text[start:end] + self.DELIMITER
         self._start = start
         self._end = end
 
@@ -162,3 +178,10 @@ class AccessibleTextLeaf(object):
     def get_cursor(self):
         pass
         # TODO Implement.
+
+    def select_range(self, start, end):
+        self._text.addSelection(self._start + start, self._start + end)
+
+    def clear_selection(self):
+        # Clearing is performed in the nodes only.
+        pass
