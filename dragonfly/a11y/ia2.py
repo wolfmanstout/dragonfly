@@ -79,7 +79,12 @@ class Controller(object):
 
     def _set_focused(self, accessible):
         with self._lock:
+            # Keep a reference to the previous accessible so that the destructor
+            # is not called while the lock is held, which can trigger event
+            # handling and then deadlock.
+            to_delete = self._focused
             self._focused = accessible
+        to_delete = None
     
 
 # TODO Rethink separation into object accessible outside of ia2 thread.
