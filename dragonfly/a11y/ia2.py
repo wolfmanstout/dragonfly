@@ -13,10 +13,9 @@ class Controller(object):
             self.return_value = None
     
     def __init__(self):
-        self._focused = None
+        self._context = Context()
         # TODO Replace with a completely synchronous queue (size 0).
         self._closure_queue = Queue.Queue(1)
-        self._lock = threading.Lock()
 
     def _start_blocking(self):
         # Import here so that it can be used in a background thread. The import
@@ -24,21 +23,8 @@ class Controller(object):
         global pyia2
         import pyia2
 
-        # Set up event listeners.
-        def update_focus(event):
-            accessible = pyia2.accessibleObjectFromEvent(event)
-            if not accessible:
-                self._set_focused(None)
-                return
-            accessible2 = pyia2.accessible2FromAccessible(accessible,
-                                                          pyia2.CHILDID_SELF)
-            if not isinstance(accessible2, pyia2.IA2Lib.IAccessible2):
-                self._set_focused(None)
-                return
-            self._set_focused(Accessible(accessible2, self))
-
-        pyia2.Registry.registerEventListener(update_focus,
-                                             pyia2.EVENT_OBJECT_FOCUS)
+        # Register event listeners.
+        self._context._register_listeners()
 
         # Process events.
         while not self.shutdown_event.is_set():
@@ -48,7 +34,7 @@ class Controller(object):
                 while True:
                     capture = self._closure_queue.get_nowait()
                     try:
-                        capture.return_value = capture.closure()
+                        capture.return_value = capture.closure(self._context)
                     except Exception as exception:
                         capture.exception = exception
                         # The stack trace won't be captured, so print here.
@@ -72,37 +58,42 @@ class Controller(object):
         if capture.exception:
             raise capture.exception
         return capture.return_value
-
-    def get_focused(self):
-        with self._lock:
-            return self._focused
-
-    def _set_focused(self, accessible):
-        with self._lock:
-            # Keep a reference to the previous accessible so that the destructor
-            # is not called while the lock is held, which can trigger event
-            # handling and then deadlock.
-            to_delete = self._focused
-            self._focused = accessible
-        to_delete = None
     
 
-# TODO Rethink separation into object accessible outside of ia2 thread.
-class Accessible(object):
-    def __init__(self, accessible, controller):
-        self._accessible = accessible
-        self._controller = controller
+class Context(object):
+    def __init__(self):
+        self.focused = None
 
-    def _create_accessible_text(self):
+    def _register_listeners(self):
+        pyia2.Registry.registerEventListener(self._update_focus,
+                                             pyia2.EVENT_OBJECT_FOCUS)
+
+    def _update_focus(self, event):
+        accessible = pyia2.accessibleObjectFromEvent(event)
+        if not accessible:
+            self.focused = None
+            return
+        accessible2 = pyia2.accessible2FromAccessible(accessible,
+                                                      pyia2.CHILDID_SELF)
+        if not isinstance(accessible2, pyia2.IA2Lib.IAccessible2):
+            self.focused = None
+            return
+        self.focused = Accessible(accessible2)
+        print "Set focused. accessible2: %s" % accessible2
+
+
+class Accessible(object):
+    def __init__(self, accessible):
+        self._accessible = accessible
+
+    def as_text(self):
         # TODO Handle exceptions.
         text = self._accessible.QueryInterface(pyia2.IA2Lib.IAccessibleText)
         return AccessibleTextNode(text)
 
     def is_editable(self):
-        return self._controller.run_sync(lambda: pyia2.IA2_STATE_EDITABLE & self._accessible.states)
+        return pyia2.IA2_STATE_EDITABLE & self._accessible.states
 
-    def manipulate_text(self, callback):
-        return self._controller.run_sync(lambda: callback(self._create_accessible_text()))
 
 class AccessibleTextNode(object):
     def __init__(self, accessible_text):

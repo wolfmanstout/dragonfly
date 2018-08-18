@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-from ...a11y import ConnectA11yController
+from ... import a11y
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
@@ -283,8 +283,7 @@ class GoogleSpeechEngine(EngineBase):
                         break
                 if not success:
                     # Dictate into editable text widget.
-                    focused = self._controller.get_focused()
-                    if focused and focused.is_editable():
+                    if a11y.utils.is_editable_focused(self._controller):
                         # TODO Escape transcript.
                         aenea.strict.Text(transcript).execute()
                         self._log.debug("Entered text into editable")
@@ -313,7 +312,7 @@ class GoogleSpeechEngine(EngineBase):
         )
 
         self.connect()
-        with ConnectA11yController() as controller:
+        with a11y.ConnectA11yController() as controller:
             self._controller = controller
             with MicrophoneStream(RATE, CHUNK) as stream:
                 while self._connected:
