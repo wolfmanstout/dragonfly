@@ -106,7 +106,7 @@ class BoundingBox(object):
         return "x=%s, y=%s, width=%s, height=%s" % (self.x, self.y, self.width, self.height)
 
 class AccessibleTextNode(object):
-    def __init__(self, accessible_text):
+    def __init__(self, accessible_text, may_have_cursor=True):
         self._text = accessible_text
         self._children = []
         text_length = self._text.nCharacters
@@ -127,7 +127,7 @@ class AccessibleTextNode(object):
             hyperlink = hypertext.hyperlink(hyperlink_index)
             # TODO Handle case where embedded object is non-text.
             child = hyperlink.QueryInterface(pyia2.IA2Lib.IAccessibleText)
-            child_node = AccessibleTextNode(child)
+            child_node = AccessibleTextNode(child, cursor_offset == child_index)
             self._children.append(child_node)
             expanded_text_pieces.append(child_node.expanded_text)
             end_index = child_indices[i + 1] if i < len(child_indices) - 1 else text_length
@@ -135,12 +135,16 @@ class AccessibleTextNode(object):
                 self._add_leaf(child_index + 1, end_index, text, expanded_text_pieces, cursor_offset)
         self.expanded_text = "".join(expanded_text_pieces)
         self.cursor = None
-        offset = 0
-        for child in self._children:
-            if child.cursor is not None:
-                self.cursor = offset + child.cursor
-                break;
-            offset += len(child.expanded_text)
+        # Only look for cursor if we might have it. This works around a Chrome
+        # bug where nodes report the cursor at 0 instead of -1 when they don't
+        # have the cursor.
+        if may_have_cursor:
+            offset = 0
+            for child in self._children:
+                if child.cursor is not None:
+                    self.cursor = offset + child.cursor
+                    break;
+                offset += len(child.expanded_text)
     
     def _add_leaf(self, start, end, text, expanded_text_pieces, cursor_offset):
         child = AccessibleTextLeaf(self._text, text, start, end, cursor_offset)
