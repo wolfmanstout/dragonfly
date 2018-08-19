@@ -80,7 +80,7 @@ class Context(object):
             self.focused = None
             return
         self.focused = Accessible(accessible2)
-        print "Set focused. accessible2: %s" % accessible2
+        # print "Set focused. accessible2: %s" % accessible2
 
 
 class Accessible(object):
@@ -111,12 +111,15 @@ class AccessibleTextNode(object):
         self._children = []
         text_length = self._text.nCharacters
         text = self._text.text(0, text_length) if text_length > 0 else ""
+        cursor_offset = self._text.caretOffset
+        if cursor_offset < 0:
+            cursor_offset = None
         expanded_text_pieces = []
         child_indices = [i for i, c in enumerate(text) if c == u"\ufffc"]
         if len(child_indices) == 0:
-            self._add_leaf(0, text_length, text, expanded_text_pieces)
+            self._add_leaf(0, text_length, text, expanded_text_pieces, cursor_offset)
         elif child_indices[0] > 0:
-            self._add_leaf(0, child_indices[0], text, expanded_text_pieces)
+            self._add_leaf(0, child_indices[0], text, expanded_text_pieces, cursor_offset)
         for i, child_index in enumerate(child_indices):
             # TODO Handle case where all embedded objects are non-text and this interface is not supported.
             hypertext = self._text.QueryInterface(pyia2.IA2Lib.IAccessibleHypertext)
@@ -129,11 +132,18 @@ class AccessibleTextNode(object):
             expanded_text_pieces.append(child_node.expanded_text)
             end_index = child_indices[i + 1] if i < len(child_indices) - 1 else text_length
             if end_index > child_index + 1:
-                self._add_leaf(child_index + 1, end_index, text, expanded_text_pieces)
+                self._add_leaf(child_index + 1, end_index, text, expanded_text_pieces, cursor_offset)
         self.expanded_text = "".join(expanded_text_pieces)
+        self.cursor = None
+        offset = 0
+        for child in self._children:
+            if child.cursor is not None:
+                self.cursor = offset + child.cursor
+                break;
+            offset += len(child.expanded_text)
     
-    def _add_leaf(self, start, end, text, expanded_text_pieces):
-        child = AccessibleTextLeaf(self._text, text, start, end)
+    def _add_leaf(self, start, end, text, expanded_text_pieces, cursor_offset):
+        child = AccessibleTextLeaf(self._text, text, start, end, cursor_offset)
         self._children.append(child)
         expanded_text_pieces.append(child.expanded_text)
 
@@ -147,10 +157,6 @@ class AccessibleTextNode(object):
                 return
             offset -= len(child.expanded_text)
 
-    def get_cursor(self):
-        pass
-        # TODO Implement.
-
     def get_bounding_box(self, offset):
         for child in self._children:
             if offset < len(child.expanded_text):
@@ -161,21 +167,18 @@ class AccessibleTextNode(object):
 class AccessibleTextLeaf(object):
     DELIMITER = "\x1e"
 
-    def __init__(self, accessible_text, text, start, end):
+    def __init__(self, accessible_text, text, start, end, cursor_offset):
         self._text = accessible_text
         self.expanded_text = text[start:end] + self.DELIMITER
         self._start = start
         self._end = end
+        self.cursor = cursor_offset - start if cursor_offset is not None and cursor_offset >= start and cursor_offset <= end else None
 
     def to_string(self):
         return self.expanded_text
         
     def set_cursor(self, offset):
         self._text.setCaretOffset(self._start + offset)
-
-    def get_cursor(self):
-        pass
-        # TODO Implement.
 
     def get_bounding_box(self, offset):
         return BoundingBox(*self._text.characterExtents(

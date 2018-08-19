@@ -12,8 +12,9 @@ def move_cursor(controller, phrase, before=False):
         indices = [match.start() if before else match.end()
                    for match in matches]
         if len(indices) > 0:
-            # TODO Choose index nearest to cursor location.
-            accessible_text.set_cursor(indices[0])
+            nearest = min(indices, key=((lambda x: abs(x - accessible_text.cursor))
+                                        if accessible_text.cursor is not None else None))
+            accessible_text.set_cursor(nearest)
             print "Moved cursor"
         else:
             print "Not found: %s" % phrase
@@ -31,10 +32,10 @@ def get_text_selection_points(controller, phrase):
         ranges = [(match.start(), match.end())
                   for match in matches]
         if len(ranges) > 0:
-            # TODO Choose selection nearest to cursor location.
-            selection = ranges[0]
-            start_box = accessible_text.get_bounding_box(selection[0])
-            end_box = accessible_text.get_bounding_box(selection[1] - 1)
+            nearest = min(ranges, key=((lambda x: abs((x[0] + x[1]) / 2 - accessible_text.cursor))
+                                       if accessible_text.cursor is not None else None))
+            start_box = accessible_text.get_bounding_box(nearest[0])
+            end_box = accessible_text.get_bounding_box(nearest[1] - 1)
             return ((start_box.x, start_box.y + start_box.height / 2),
                     (end_box.x + end_box.width, end_box.y + end_box.height / 2))
         else:
