@@ -95,6 +95,15 @@ class Accessible(object):
     def is_editable(self):
         return pyia2.IA2_STATE_EDITABLE & self._accessible.states
 
+class BoundingBox(object):
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+
+    def __str__(self):
+        return "x=%s, y=%s, width=%s, height=%s" % (self.x, self.y, self.width, self.height)
 
 class AccessibleTextNode(object):
     def __init__(self, accessible_text):
@@ -142,22 +151,12 @@ class AccessibleTextNode(object):
         pass
         # TODO Implement.
 
-    def select_range(self, start, end):
+    def get_bounding_box(self, offset):
         for child in self._children:
-            if start < len(child.expanded_text):
-                child.select_range(start if start >= 0 else 0,
-                                   end if end < len(child.expanded_text) else len(child.expanded_text) - 1)
-            if end < len(child.expanded_text):
-                return
-            start -= len(child.expanded_text)
-            end -= len(child.expanded_text)
-
-    def clear_selection(self):
-        self._text.setSelection(0, 0, 0)
-        self._text.removeSelection(0)
-        for child in self._children:
-            child.clear_selection()
-
+            if offset < len(child.expanded_text):
+                return child.get_bounding_box(offset)
+            offset -= len(child.expanded_text)
+        
 
 class AccessibleTextLeaf(object):
     DELIMITER = "\x1e"
@@ -172,16 +171,13 @@ class AccessibleTextLeaf(object):
         return self.expanded_text
         
     def set_cursor(self, offset):
-        # print "set_cursor: %s, %s" % (offset, self.expanded_text)
         self._text.setCaretOffset(self._start + offset)
 
     def get_cursor(self):
         pass
         # TODO Implement.
 
-    def select_range(self, start, end):
-        self._text.addSelection(self._start + start, self._start + end)
-
-    def clear_selection(self):
-        # Clearing is performed in the nodes only.
-        pass
+    def get_bounding_box(self, offset):
+        return BoundingBox(*self._text.characterExtents(
+            self._start + offset,
+            pyia2.IA2Lib.IA2_COORDTYPE_SCREEN_RELATIVE))

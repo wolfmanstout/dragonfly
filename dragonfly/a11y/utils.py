@@ -19,8 +19,8 @@ def move_cursor(controller, phrase, before=False):
             print "Not found: %s" % phrase
     controller.run_sync(closure)
 
-def select_text(controller, phrase):
-    print "Selecting text: %s" % phrase
+def get_text_selection_points(controller, phrase):
+    print "Getting text selection points: %s" % phrase
     def closure(context):
         if not context.focused:
             print "Nothing is focused."
@@ -32,12 +32,14 @@ def select_text(controller, phrase):
                   for match in matches]
         if len(ranges) > 0:
             # TODO Choose selection nearest to cursor location.
-            accessible_text.clear_selection()
-            accessible_text.select_range(*ranges[0])
-            print "Selected text"
+            selection = ranges[0]
+            start_box = accessible_text.get_bounding_box(selection[0])
+            end_box = accessible_text.get_bounding_box(selection[1] - 1)
+            return ((start_box.x, start_box.y + start_box.height / 2),
+                    (end_box.x + end_box.width, end_box.y + end_box.height / 2))
         else:
             print "Not found: %s" % phrase
-    controller.run_sync(closure)
+    return controller.run_sync(closure)
     
 
 def is_editable_focused(controller):
