@@ -1,6 +1,8 @@
 import re
 
 def move_cursor(controller, phrase, before=False):
+    """Moves the cursor before or after the provided phrase."""
+
     print "Moving cursor %s phrase: %s" % ("before" if before else "after", phrase)
     def closure(context):
         if not context.focused:
@@ -20,12 +22,15 @@ def move_cursor(controller, phrase, before=False):
             print "Not found: %s" % phrase
     controller.run_sync(closure)
 
-# Use mouse-based selection instead of the built-in selection system. Support
-# for this system is spotty when selecting across multiple objects. In Firefox
-# you get results that look right, but the selection doesn't behave like a
-# normal selection. Chrome simply does not support selections across multiple
-# objects.
+
 def get_text_selection_points(controller, phrase):
+    """Gets the starting and ending selection points needed to select the provided
+    phrase. This uses mouse-based selection instead of the built-in selection
+    system because support for this system is spotty when selecting across
+    multiple objects. In Firefox you get results that look right, but the
+    selection doesn't behave like a normal selection. Chrome simply does not
+    support selections across multiple objects."""
+
     print "Getting text selection points: %s" % phrase
     def closure(context):
         if not context.focused:
@@ -46,9 +51,11 @@ def get_text_selection_points(controller, phrase):
         else:
             print "Not found: %s" % phrase
     return controller.run_sync(closure)
-    
+
 
 def is_editable_focused(controller):
+    """Returns true if an editable object is focused."""
+
     def closure(context):
         return context.focused and context.focused.is_editable()
     return controller.run_sync(closure)

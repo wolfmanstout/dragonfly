@@ -4,6 +4,8 @@ import traceback
 
 
 class Controller(object):
+    """Provides access to the IAccessible2 subsystem. All accesses to this subsystem
+    must be run in a single thread, which is managed here."""
 
     class Capture(object):
         def __init__(self, closure):
@@ -11,7 +13,7 @@ class Controller(object):
             self.done_event = threading.Event()
             self.exception = None
             self.return_value = None
-    
+
     def __init__(self):
         self._context = Context()
         # TODO Replace with a completely synchronous queue (size 0).
@@ -43,7 +45,7 @@ class Controller(object):
                     capture.done_event.set()
             except Queue.Empty:
                 pass
-                
+
     def start(self):
         self.shutdown_event = threading.Event()
         thread = threading.Thread(target=self._start_blocking)
@@ -59,9 +61,11 @@ class Controller(object):
         if capture.exception:
             raise capture.exception
         return capture.return_value
-    
+
 
 class Context(object):
+    """Provides access to the current IAccessible2 context, such as focused objects."""
+
     def __init__(self):
         self.focused = None
 
@@ -84,6 +88,8 @@ class Context(object):
 
 
 class Accessible(object):
+    """Wraps an IAccessible2."""
+
     def __init__(self, accessible):
         self._accessible = accessible
 
@@ -96,6 +102,8 @@ class Accessible(object):
         return pyia2.IA2_STATE_EDITABLE & self._accessible.states
 
 class BoundingBox(object):
+    """Represents a bounding box in screen coordinates."""
+
     def __init__(self, x, y, width, height):
         self.x = x
         self.y = y
@@ -106,6 +114,10 @@ class BoundingBox(object):
         return "x=%s, y=%s, width=%s, height=%s" % (self.x, self.y, self.width, self.height)
 
 class AccessibleTextNode(object):
+    """Provides a wrapper around a snapshot of IAccessibleText. Mutable methods will
+    affect the underlying IAccessibleText, but the changes will not be reflected
+    here."""
+
     def __init__(self, accessible_text, may_have_cursor=True):
         self._text = accessible_text
         self._children = []
@@ -145,16 +157,18 @@ class AccessibleTextNode(object):
                     self.cursor = offset + child.cursor
                     break;
                 offset += len(child.expanded_text)
-    
+
+    def __str__(self):
+        return "(" + ", ".join(str(child) for child in self._children) + ")"
+
     def _add_leaf(self, start, end, text, expanded_text_pieces, cursor_offset):
         child = AccessibleTextLeaf(self._text, text, start, end, cursor_offset)
         self._children.append(child)
         expanded_text_pieces.append(child.expanded_text)
 
-    def to_string(self):
-        return "(" + ", ".join(child.to_string() for child in self._children) + ")"
-
     def set_cursor(self, offset):
+        """Sets the cursor to the given offset. Note that the update will not be
+        reflected in self.cursor."""
         for child in self._children:
             if offset < len(child.expanded_text):
                 child.set_cursor(offset)
@@ -166,9 +180,13 @@ class AccessibleTextNode(object):
             if offset < len(child.expanded_text):
                 return child.get_bounding_box(offset)
             offset -= len(child.expanded_text)
-        
+
 
 class AccessibleTextLeaf(object):
+    """Wrapper around a pure-text segment of an IAccessibleText. Mutable methods
+    will affect the underlying IAccessibleText, but the changes will not be
+    reflected here."""
+
     DELIMITER = "\x1e"
 
     def __init__(self, accessible_text, text, start, end, cursor_offset):
@@ -178,10 +196,12 @@ class AccessibleTextLeaf(object):
         self._end = end
         self.cursor = cursor_offset - start if cursor_offset is not None and cursor_offset >= start and cursor_offset <= end else None
 
-    def to_string(self):
+    def __str__(self):
         return self.expanded_text
-        
+
     def set_cursor(self, offset):
+        """Sets the cursor to the given offset. Note that the update will not be
+        reflected in self.cursor."""
         self._text.setCaretOffset(self._start + offset)
 
     def get_bounding_box(self, offset):
