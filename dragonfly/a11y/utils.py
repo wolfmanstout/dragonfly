@@ -20,6 +20,11 @@ def move_cursor(controller, phrase, before=False):
             print "Not found: %s" % phrase
     controller.run_sync(closure)
 
+# Use mouse-based selection instead of the built-in selection system. Support
+# for this system is spotty when selecting across multiple objects. In Firefox
+# you get results that look right, but the selection doesn't behave like a
+# normal selection. Chrome simply does not support selections across multiple
+# objects.
 def get_text_selection_points(controller, phrase):
     print "Getting text selection points: %s" % phrase
     def closure(context):
