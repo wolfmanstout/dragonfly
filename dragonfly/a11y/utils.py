@@ -1,5 +1,23 @@
 import re
 
+def get_cursor_offset(controller):
+    def closure(context):
+        if not context.focused:
+            print "Nothing is focused."
+            return
+        return context.focused.as_text().cursor
+    return controller.run_sync(closure)
+    
+
+def set_cursor_offset(controller, offset):
+    def closure(context):
+        if not context.focused:
+            print "Nothing is focused."
+            return
+        context.focused.as_text().set_cursor(offset)
+    controller.run_sync(closure)
+    
+
 def move_cursor(controller, phrase, before=False):
     """Moves the cursor before or after the provided phrase."""
 
@@ -9,7 +27,8 @@ def move_cursor(controller, phrase, before=False):
             print "Nothing is focused."
             return
         accessible_text = context.focused.as_text()
-        regex = r"[^A-Za-z]*".join(re.escape(word) for word in re.split(r"[^A-Za-z]+", phrase))
+        regex = r"[^A-Za-z]*".join(re.escape(word) if word != "through" else ".*?"
+                                   for word in re.split(r"[^A-Za-z]+", phrase))
         matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
         indices = [match.start() if before else match.end()
                    for match in matches]
@@ -37,7 +56,8 @@ def get_text_selection_points(controller, phrase):
             print "Nothing is focused."
             return
         accessible_text = context.focused.as_text()
-        regex = r"[^A-Za-z]*".join(re.escape(word) for word in re.split(r"[^A-Za-z]+", phrase))
+        regex = r"[^A-Za-z]*".join(re.escape(word) if word != "through" else ".*?"
+                                   for word in re.split(r"[^A-Za-z]+", phrase))
         matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
         ranges = [(match.start(), match.end())
                   for match in matches]
