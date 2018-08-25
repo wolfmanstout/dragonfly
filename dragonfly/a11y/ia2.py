@@ -1,6 +1,8 @@
 import Queue
+import thread
 import threading
 import traceback
+import time
 
 
 class Controller(object):
@@ -18,6 +20,41 @@ class Controller(object):
         self._context = Context()
         # TODO Replace with a completely synchronous queue (size 0).
         self._closure_queue = Queue.Queue(1)
+        self._focus_queue = []
+
+    def _update_focus(self, event):
+        # Add event to a queue for later processing. IAccessible2 functions can
+        # cause reentrancy into event handling, so we do this to ensure correct
+        # order of processing.
+        self._focus_queue.append(event)
+        
+    def _process_focus_events(self):
+        if not self._focus_queue:
+            return
+        
+        # Get the latest focus event, skipping obsolete events.
+        if len(self._focus_queue) > 1:
+            print "Skipping %s focus events." % (len(self._focus_queue) - 1)
+        event = self._focus_queue[-1]
+        self._focus_queue = []
+
+        accessible_start = time.time()
+        accessible = pyia2.accessibleObjectFromEvent(event)
+        print "Attempted to convert to accessible: %.10f" % (time.time() - accessible_start)
+        if not accessible:
+            self._context.focused = None
+            return
+        
+        accessible2_start = time.time()
+        accessible2 = pyia2.accessible2FromAccessible(accessible,
+                                                      pyia2.CHILDID_SELF)
+        print "Attempted to convert to accessible2: %.10f" % (time.time() - accessible2_start)
+        if not isinstance(accessible2, pyia2.IA2Lib.IAccessible2):
+            self._context.focused = None
+            return
+
+        self._context.focused = Accessible(accessible2)
+        print "Set focused. accessible2: %s" % accessible2
 
     def _start_blocking(self):
         # Import here so that it can be used in a background thread. The import
@@ -27,24 +64,32 @@ class Controller(object):
         import pyia2
 
         # Register event listeners.
-        self._context._register_listeners()
+        pyia2.Registry.registerEventListener(self._update_focus,
+                                             pyia2.EVENT_OBJECT_FOCUS)
 
-        # Process events.
+        # Perform all IAccessible2 operations as they are enqueued.
         while not self.shutdown_event.is_set():
             pyia2.Registry.iter_loop(0.01)
-            # TODO Register this directly in iter_loop to avoid waiting.
+            
+            # Process events.
             try:
-                while True:
+                self._process_focus_events()
+            except Exception:
+                traceback.print_exc()
+                
+            # Process closures.
+            while True:
+                try:
                     capture = self._closure_queue.get_nowait()
-                    try:
-                        capture.return_value = capture.closure(self._context)
-                    except Exception as exception:
-                        capture.exception = exception
-                        # The stack trace won't be captured, so print here.
-                        traceback.print_exc()
-                    capture.done_event.set()
-            except Queue.Empty:
-                pass
+                except Queue.Empty:
+                    break
+                try:
+                    capture.return_value = capture.closure(self._context)
+                except Exception as exception:
+                    capture.exception = exception
+                    # The stack trace won't be captured, so print here.
+                    traceback.print_exc()
+                capture.done_event.set()
 
     def start(self):
         self.shutdown_event = threading.Event()
@@ -68,23 +113,6 @@ class Context(object):
 
     def __init__(self):
         self.focused = None
-
-    def _register_listeners(self):
-        pyia2.Registry.registerEventListener(self._update_focus,
-                                             pyia2.EVENT_OBJECT_FOCUS)
-
-    def _update_focus(self, event):
-        accessible = pyia2.accessibleObjectFromEvent(event)
-        if not accessible:
-            self.focused = None
-            return
-        accessible2 = pyia2.accessible2FromAccessible(accessible,
-                                                      pyia2.CHILDID_SELF)
-        if not isinstance(accessible2, pyia2.IA2Lib.IAccessible2):
-            self.focused = None
-            return
-        self.focused = Accessible(accessible2)
-        # print "Set focused. accessible2: %s" % accessible2
 
 
 class Accessible(object):
@@ -128,7 +156,7 @@ class AccessibleTextNode(object):
             cursor_offset = None
         expanded_text_pieces = []
         child_indices = [i for i, c in enumerate(text) if c == u"\ufffc"]
-        if len(child_indices) == 0:
+        if not child_indices:
             self._add_leaf(0, text_length, text, expanded_text_pieces, cursor_offset)
         elif child_indices[0] > 0:
             self._add_leaf(0, child_indices[0], text, expanded_text_pieces, cursor_offset)
