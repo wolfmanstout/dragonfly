@@ -122,8 +122,10 @@ class Accessible(object):
         self._accessible = accessible
 
     def as_text(self):
-        # TODO Handle exceptions.
-        text = self._accessible.QueryInterface(pyia2.IA2Lib.IAccessibleText)
+        try:
+            text = self._accessible.QueryInterface(pyia2.IA2Lib.IAccessibleText)
+        except comtypes.COMError:
+            return None
         return AccessibleTextNode(text)
 
     def is_editable(self):
