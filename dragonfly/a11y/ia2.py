@@ -27,11 +27,11 @@ class Controller(object):
         # cause reentrancy into event handling, so we do this to ensure correct
         # order of processing.
         self._focus_queue.append(event)
-        
+
     def _process_focus_events(self):
         if not self._focus_queue:
             return
-        
+
         # Get the latest focus event, skipping obsolete events.
         if len(self._focus_queue) > 1:
             print "Skipping %s focus events." % (len(self._focus_queue) - 1)
@@ -44,7 +44,7 @@ class Controller(object):
         if not accessible:
             self._context.focused = None
             return
-        
+
         accessible2_start = time.time()
         accessible2 = pyia2.accessible2FromAccessible(accessible,
                                                       pyia2.CHILDID_SELF)
@@ -70,13 +70,13 @@ class Controller(object):
         # Perform all IAccessible2 operations as they are enqueued.
         while not self.shutdown_event.is_set():
             pyia2.Registry.iter_loop(0.01)
-            
+
             # Process events.
             try:
                 self._process_focus_events()
             except Exception:
                 traceback.print_exc()
-                
+
             # Process closures.
             while True:
                 try:

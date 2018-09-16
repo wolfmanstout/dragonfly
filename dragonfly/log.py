@@ -137,7 +137,7 @@ def _setup_file_handler():
 #    import traceback; traceback.print_stack()
     if not _file_handler:
         # Lookup path the user's personal folder in which
-        #  to log Dragonfly messages.
+        # to log Dragonfly messages.
         if shell and shellcon:
             mydocs_pidl = shell.SHGetFolderLocation(0, shellcon.CSIDL_PERSONAL, 0, 0)
             mydocs_path = shell.SHGetPathFromIDList(mydocs_pidl)

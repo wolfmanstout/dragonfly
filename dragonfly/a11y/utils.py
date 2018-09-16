@@ -7,7 +7,7 @@ def get_cursor_offset(controller):
             return
         return context.focused.as_text().cursor
     return controller.run_sync(closure)
-    
+
 
 def set_cursor_offset(controller, offset):
     def closure(context):
@@ -16,7 +16,7 @@ def set_cursor_offset(controller, offset):
             return
         context.focused.as_text().set_cursor(offset)
     controller.run_sync(closure)
-    
+
 
 def move_cursor(controller, phrase, before=False):
     """Moves the cursor before or after the provided phrase."""
