@@ -22,7 +22,6 @@
 This file offers access to various action classes.
 
 """
-
 import sys
 
 # Import OS-agnostic classes
@@ -43,6 +42,7 @@ if sys.platform.startswith("win"):
     from .action_focuswindow  import FocusWindow
     from .action_startapp     import StartApp, BringApp
     from .action_playsound    import PlaySound
+    from .keyboard             import Keyboard, Typeable
 else:
     from ..os_dependent_mock import Key
     from ..os_dependent_mock import Text
@@ -52,3 +52,4 @@ else:
     from ..os_dependent_mock import FocusWindow
     from ..os_dependent_mock import StartApp, BringApp
     from ..os_dependent_mock import PlaySound
+    from ..os_dependent_mock import Keyboard, Typeable

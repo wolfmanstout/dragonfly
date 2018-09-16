@@ -18,8 +18,6 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
-import sys
-
 #---------------------------------------------------------------------------
 from .config            import Config, Section, Item
 from .error             import DragonflyError
@@ -37,6 +35,7 @@ from .grammar.elements  import (ElementBase, Sequence, Alternative,
                                 Optional, Repetition, Literal,
                                 ListRef, DictListRef, Dictation,
                                 RuleRef, RuleWrap, Empty, Compound, Choice)
+
 from .grammar.context   import Context, AppContext
 from .grammar.list      import ListBase, List, DictList
 from .grammar.recobs    import (RecognitionObserver, RecognitionHistory,
@@ -58,15 +57,14 @@ from .actions           import (ActionBase, DynStrActionBase, ActionError,
 
 #---------------------------------------------------------------------------
 
-# OS agnostic imports
+from .util              import Clipboard
+
+#---------------------------------------------------------------------------
+
 from .windows.rectangle import Rectangle, unit
 from .windows.point     import Point
-
-# Windows-specific
 from .windows           import Window
 from .windows           import Monitor, monitors
-from .windows           import Clipboard
-
 
 #---------------------------------------------------------------------------
 from .language          import (Integer, IntegerRef,
