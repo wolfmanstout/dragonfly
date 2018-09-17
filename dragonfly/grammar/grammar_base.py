@@ -346,7 +346,7 @@ class Grammar(object):
 
         # Update all rules loaded in this grammar.
         for rule in self._rules:
-            if rule.active:
+            if rule.active != False:
                 rule.activate(force=True)
         # Update all lists loaded in this grammar.
         for lst in self._lists:
