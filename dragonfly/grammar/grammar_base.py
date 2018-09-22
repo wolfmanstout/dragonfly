@@ -346,6 +346,8 @@ class Grammar(object):
 
         # Update all rules loaded in this grammar.
         for rule in self._rules:
+            # Explicitly compare to False so that uninitialized rules (which
+            # have active set to None) are activated.
             if rule.active != False:
                 rule.activate(force=True)
         # Update all lists loaded in this grammar.
