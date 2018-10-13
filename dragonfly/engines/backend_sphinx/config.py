@@ -1,7 +1,7 @@
 # This Python file uses the following encoding: utf-8
 
 """
-Default CMU Pocket Sphinx engine class configuration module
+CMU Pocket Sphinx engine configuration module.
 """
 
 from sphinxwrapper import DefaultConfig
@@ -13,6 +13,25 @@ DECODER_CONFIG = DefaultConfig()
 
 # Silence the decoder output by default.
 DECODER_CONFIG.set_string("-logfn", os.devnull)
+
+# Set voice activity detection configuration options for the decoder.
+# You may wish to experiment with these if noise in the background triggers speech
+# start and/or false recognitions (e.g. of short words) frequently. Descriptions
+# for VAD configuration options were retrieved from:
+# https://cmusphinx.github.io/doc/sphinxbase/fe_8h_source.html
+
+# Number of silence frames to keep after from speech to silence.
+DECODER_CONFIG.set_int("-vad_postspeech", 50)
+
+# Number of speech frames to keep before silence to speech.
+DECODER_CONFIG.set_int("-vad_prespeech", 20)
+
+# Number of speech frames to trigger vad from silence to speech.
+DECODER_CONFIG.set_int("-vad_startspeech", 10)
+
+# Threshold for decision between noise and silence frames. Log-ratio between signal
+# level and noise level.
+DECODER_CONFIG.set_float("-vad_threshold", 3.0)
 
 # Configuration for wake/sleep phrases
 # Note that the following CMU Sphinx tutorial has some advice on keyword threshold

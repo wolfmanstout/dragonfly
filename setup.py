@@ -18,9 +18,6 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
-from ez_setup import use_setuptools
-use_setuptools()
-
 import os.path
 import re
 from setuptools import setup, find_packages
@@ -45,15 +42,21 @@ def read(*names):
 
 
 setup(
-      name          = "dragonfly",
-      version       = release,
-      description   = "Speech recognition extension library",
-      author        = "Christo Butcher",
-      author_email  = "dist.dragonfly@twizzy.biz",
-      license       = "LICENSE.txt",
-      url           = "https://github.com/t4ngo/dragonfly",
-      zip_safe      = False,  # To unzip documentation files.
-      long_description = read("README.md"),
+      name             = "dragonfly2",
+      version          = release,
+      description      = "Speech recognition extension library",
+      author           = "Christo Butcher",
+      author_email     = "dist.dragonfly@twizzy.biz",
+      maintainer       = "Dane Finlay",
+      maintainer_email = "Danesprite@gmail.com",
+      license          = "LICENSE.txt",
+      url              = "https://github.com/Danesprite/dragonfly",
+      zip_safe         = False,  # To unzip documentation files.
+      long_description = read("README.rst"),
+
+      package_data={
+                    "": ["*.txt", "*.rst"]
+                   },
 
       install_requires=[
                         "setuptools >= 0.6c7",
