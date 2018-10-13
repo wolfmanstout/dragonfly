@@ -6,15 +6,21 @@ and this project will adhere to [Semantic Versioning](http://semver.org/spec/v2.
 
 Note: this project had no release versions between [0.6.6b1] and [0.7.0]. Notable changes made between these versions are documented in the commit history and will be placed under headings in this file over time.
 
-## [Unreleased]
+## [0.8.0] - 2018-09-27
 ### Added
 - Add EngineBase.grammars property for retrieving loaded grammars.
 - Add MappingRule.specs property to allow retrieval of specs after initialisation.
 - Add checks in Sphinx engine for using unknown words in grammars and keyphrases.
 - Add configurable speech and hypothesis recording to Sphinx engine for model training.
+- Add Sphinx engine documentation page.
 
 ### Changed
-- Update pyjsgf submodule to version 1.5.0.
+- Change Sphinx engine module loader to use local engine config if it exists.
+- Change README to reference the new documentation page on the Sphinx engine.
+- Change documentation/conf.py to allow the docs to be built locally.
+- Change package distribution name to *dragonfly2* in order to upload releases to PyPI.org.
+- Update README and documentation/installation.txt with instructions to install via pip.
+- Replace README.md with README.rst because PyPI doesn't easily support markdown any more.
 
 ### Fixed
 - Fix a bug with CompoundRule.spec.
@@ -22,7 +28,12 @@ Note: this project had no release versions between [0.6.6b1] and [0.7.0]. Notabl
 - Update virtual keyboard extended key support (thanks [@Versatilus](https://github.com/Versatilus)).
 - Add missing methods for WSR and Sphinx engines in test/element_tester.
 - Fix a few minor problems with the Sphinx engine.
+- Fix bug where newly-constructed rules were not inactivated (thanks [@wolfmanstout](https://github.com/wolfmanstout)).
 
+### Removed
+- Remove pyjsgf submodule as it can be installed via pip now.
+- Remove Sphinx engine's README now that there is a documentation page.
+- Remove ez_setup.py and stop using it in setup.py.
 
 ## [0.7.0] - 2018-07-10
 ### Added
@@ -76,7 +87,8 @@ TODO
 ## [0.6.1] - 2008-10-18
 This release is the first in the Git version control system.
 
-[Unreleased]: https://github.com/Danesprite/dragonfly/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/Danesprite/dragonfly/compare/0.8.0...HEAD
+[0.8.0]:      https://github.com/Danesprite/dragonfly/compare/0.7.0...0.8.0
 [0.7.0]:      https://github.com/Danesprite/dragonfly/compare/74981c1...0.7.0
 [0.6.6b1]:    https://github.com/Danesprite/dragonfly/compare/0.6.5...0.6.6b1
 [0.6.5]:      https://github.com/Danesprite/dragonfly/compare/0.6.4-rc3...0.6.5
