@@ -67,9 +67,6 @@ The code below moves the mouse cursor 25 pixels right and 25 pixels up
     #  by the given number of pixels.
     Mouse("<25, -25>").execute()
 
-The following code scrolls down 4 mouse scroll wheel clicks::
-
-    Mouse("scrolldown:4").execute()
 
 Mouse specification format
 ............................................................................
@@ -141,19 +138,6 @@ Mouse button-hold or button-release action:
 
     - ``down`` -- hold the button down
     - ``up`` -- release the button
-
- - *pause* --
-   Specifies how long to pause *after* clicking the button; same as above.
-
-Mouse scroll wheel action:
-   *direction* [``:`` *repeat*] [``/`` *pause*]
-
- - *direction* -- Specifies which direction to scroll:
-
-    - ``scrolldown`` -- scroll down
-    - ``scrollup`` -- scroll up
-
- - *repeat* -- Specifies how many scroll wheel clicks to simulate.
 
  - *pause* --
    Specifies how long to pause *after* clicking the button; same as above.
@@ -280,20 +264,6 @@ class _Button(_EventBase):
         send_input_array(array)
 
 
-class _Scroll(_EventBase):
-
-    def __init__(self, flag, amount):
-        _EventBase.__init__(self)
-        self._flag = flag
-        self._amount = amount
-
-    def execute(self, window):
-        zero = pointer(c_ulong(0))
-        inputs = [MouseInput(0, 0, self._amount, self._flag, 0, zero)]
-        array = make_input_array(inputs)
-        send_input_array(array)
-
-
 class _Pause(_EventBase):
 
     def __init__(self, interval):
@@ -405,15 +375,6 @@ class Mouse(DynStrActionBase):
                                 (win32con.MOUSEEVENTF_XUP, 2)),
                     }
 
-    # Scroll amounts are multiples of 120, which is WHEEL_DELTA,
-    # or one scroll wheel click.
-    _scroll_flags = {
-                     "scrolldown":   (win32con.MOUSEEVENTF_WHEEL, -120),
-                     "scrollup":  (win32con.MOUSEEVENTF_WHEEL, 120),
-                     "wheeldown":   (win32con.MOUSEEVENTF_WHEEL, -120),
-                     "wheelup":  (win32con.MOUSEEVENTF_WHEEL, 120),
-                    }
-
     def _process_button(self, spec, events):
         parts = spec.split(":", 1)
         button = parts[0].strip()
@@ -442,24 +403,6 @@ class Mouse(DynStrActionBase):
         events.append(event)
         return True
 
-    def _process_scroll(self, spec, events):
-        parts = spec.split(":", 1)
-        direction = parts[0].strip()
-        if len(parts) == 1:  special = 1
-        else:                special = parts[1].strip()
-
-        if direction not in self._scroll_flags:
-            return False
-        flag, multiplier = self._scroll_flags[direction]
-        try:
-            amount = int(special)
-        except ValueError:
-            return False
-        event = _Scroll(flag, multiplier * amount)
-
-        events.append(event)
-        return True
-
     def _process_pause(self, spec, events):
         if not spec.startswith("/"):
             return False
@@ -473,7 +416,6 @@ class Mouse(DynStrActionBase):
                  _process_screen_position,
                  _process_relative_position,
                  _process_button,
-                 _process_scroll,
                  _process_pause,
                 ]
 
