@@ -67,9 +67,6 @@ The code below moves the mouse cursor 25 pixels right and 25 pixels up
     #  by the given number of pixels.
     Mouse("<25, -25>").execute()
 
-The following code scrolls down 4 mouse scroll wheel clicks::
-
-    Mouse("scrolldown:4").execute()
 
 Mouse specification format
 ............................................................................
@@ -108,6 +105,16 @@ Mouse button-press action:
     - ``left`` -- left mouse button key
     - ``middle`` -- middle mouse button key
     - ``right`` -- right mouse button key
+    - ``four`` -- fourth mouse button key
+    - ``five`` -- fifth mouse button key
+    - ``wheelup`` -- mouse wheel up
+    - ``stepup`` -- mouse wheel up 1/3
+    - ``wheeldown`` -- mouse wheel down
+    - ``stepdown`` -- mouse wheel down 1/3
+    - ``wheelright`` -- mouse wheel right
+    - ``stepright`` -- mouse wheel right 1/3
+    - ``wheelleft`` -- mouse wheel left
+    - ``stepleft`` -- mouse wheel left 1/3
 
  - *repeat* -- Specifies how many times the button should be clicked:
 
@@ -135,19 +142,6 @@ Mouse button-hold or button-release action:
  - *pause* --
    Specifies how long to pause *after* clicking the button; same as above.
 
-Mouse scroll wheel action:
-   *direction* [``:`` *repeat*] [``/`` *pause*]
-
- - *direction* -- Specifies which direction to scroll:
-
-    - ``scrolldown`` -- scroll down
-    - ``scrollup`` -- scroll up
-
- - *repeat* -- Specifies how many scroll wheel clicks to simulate.
-
- - *pause* --
-   Specifies how long to pause *after* clicking the button; same as above.
-
 
 Mouse class reference
 ............................................................................
@@ -156,13 +150,17 @@ Mouse class reference
 
 import time
 import win32con
-import win32gui
+
 from ctypes             import windll, pointer, c_long, c_ulong, Structure
 from .sendinput         import MouseInput, make_input_array, send_input_array
 from .action_base       import DynStrActionBase, ActionError
 from ..windows.window   import Window
 from ..windows.monitor  import monitors
 
+
+#---------------------------------------------------------------------------
+
+MOUSEEVENTF_HWHEEL = 0x1000 # taken from https://msdn.microsoft.com/en-us/library/windows/desktop/ms646273(v=vs.85).aspx
 
 #---------------------------------------------------------------------------
 
@@ -260,22 +258,8 @@ class _Button(_EventBase):
 
     def execute(self, window):
         zero = pointer(c_ulong(0))
-        inputs = [MouseInput(0, 0, 0, flag, 0, zero)
+        inputs = [MouseInput(0, 0, flag[1], flag[0], 0, zero)
                   for flag in self._flags]
-        array = make_input_array(inputs)
-        send_input_array(array)
-
-
-class _Scroll(_EventBase):
-
-    def __init__(self, flag, amount):
-        _EventBase.__init__(self)
-        self._flag = flag
-        self._amount = amount
-
-    def execute(self, window):
-        zero = pointer(c_ulong(0))
-        inputs = [MouseInput(0, 0, self._amount, self._flag, 0, zero)]
         array = make_input_array(inputs)
         send_input_array(array)
 
@@ -363,21 +347,32 @@ class Mouse(DynStrActionBase):
         return True
 
     _button_flags = {
-                     "left":   (win32con.MOUSEEVENTF_LEFTDOWN,
-                                win32con.MOUSEEVENTF_LEFTUP),
-                     "right":  (win32con.MOUSEEVENTF_RIGHTDOWN,
-                                win32con.MOUSEEVENTF_RIGHTUP),
-                     "middle": (win32con.MOUSEEVENTF_MIDDLEDOWN,
-                                win32con.MOUSEEVENTF_MIDDLEUP),
-                    }
-
-    # Scroll amounts are multiples of 120, which is WHEEL_DELTA,
-    # or one scroll wheel click.
-    _scroll_flags = {
-                     "scrolldown":   (win32con.MOUSEEVENTF_WHEEL, -120),
-                     "scrollup":  (win32con.MOUSEEVENTF_WHEEL, 120),
-                     "wheeldown":   (win32con.MOUSEEVENTF_WHEEL, -120),
-                     "wheelup":  (win32con.MOUSEEVENTF_WHEEL, 120),
+                     "left":   ((win32con.MOUSEEVENTF_LEFTDOWN, 0),
+                                (win32con.MOUSEEVENTF_LEFTUP, 0)),
+                     "right":  ((win32con.MOUSEEVENTF_RIGHTDOWN, 0),
+                                (win32con.MOUSEEVENTF_RIGHTUP, 0)),
+                     "middle": ((win32con.MOUSEEVENTF_MIDDLEDOWN, 0),
+                                (win32con.MOUSEEVENTF_MIDDLEUP, 0)),
+                     "wheelup": ((win32con.MOUSEEVENTF_WHEEL, 120),
+                                (win32con.MOUSEEVENTF_WHEEL, 0)),
+                     "stepup": ((win32con.MOUSEEVENTF_WHEEL, 40),
+                                (win32con.MOUSEEVENTF_WHEEL, 0)),
+                     "wheeldown": ((win32con.MOUSEEVENTF_WHEEL, -120),
+                                (win32con.MOUSEEVENTF_WHEEL, 0)),
+                     "stepdown": ((win32con.MOUSEEVENTF_WHEEL, -40),
+                                (win32con.MOUSEEVENTF_WHEEL, 0)),
+                     "wheelright": ((MOUSEEVENTF_HWHEEL, 120),
+                                (MOUSEEVENTF_HWHEEL, 0)),
+                     "stepright": ((MOUSEEVENTF_HWHEEL, 40),
+                                (MOUSEEVENTF_HWHEEL, 0)),
+                     "wheelleft": ((MOUSEEVENTF_HWHEEL, -120),
+                                (MOUSEEVENTF_HWHEEL, 0)),
+                     "stepleft": ((MOUSEEVENTF_HWHEEL, -40),
+                                (MOUSEEVENTF_HWHEEL, 0)),
+                     "four": ((win32con.MOUSEEVENTF_XDOWN, 1),
+                                (win32con.MOUSEEVENTF_XUP, 1)),
+                     "five": ((win32con.MOUSEEVENTF_XDOWN, 2),
+                                (win32con.MOUSEEVENTF_XUP, 2)),
                     }
 
     def _process_button(self, spec, events):
@@ -390,7 +385,10 @@ class Mouse(DynStrActionBase):
             return False
         flag_down, flag_up = self._button_flags[button]
 
-        if special == "down":
+        # Disallow ':up' and ':down' for scroll events.
+        if special in ("up", "down") and ("wheel" in button or "step" in button):
+            return False
+        elif special == "down":
             event = _Button(flag_down)
         elif special == "up":
             event = _Button(flag_up)
@@ -401,24 +399,6 @@ class Mouse(DynStrActionBase):
                 return False
             flag_series = (flag_down, flag_up) * repeat
             event = _Button(*flag_series)
-
-        events.append(event)
-        return True
-
-    def _process_scroll(self, spec, events):
-        parts = spec.split(":", 1)
-        direction = parts[0].strip()
-        if len(parts) == 1:  special = 1
-        else:                special = parts[1].strip()
-
-        if direction not in self._scroll_flags:
-            return False
-        flag, multiplier = self._scroll_flags[direction]
-        try:
-            amount = int(special)
-        except ValueError:
-            return False
-        event = _Scroll(flag, multiplier * amount)
 
         events.append(event)
         return True
@@ -436,7 +416,6 @@ class Mouse(DynStrActionBase):
                  _process_screen_position,
                  _process_relative_position,
                  _process_button,
-                 _process_scroll,
                  _process_pause,
                 ]
 
