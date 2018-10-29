@@ -149,6 +149,7 @@ class AccessibleTextNode(object):
     here."""
 
     def __init__(self, accessible_text, may_have_cursor=True):
+        self.is_leaf = False
         self._text = accessible_text
         self._children = []
         text_length = self._text.nCharacters
@@ -211,6 +212,28 @@ class AccessibleTextNode(object):
                 return child.get_bounding_box(offset)
             offset -= len(child.expanded_text)
 
+    def _get_child_and_child_offset(self, offset):
+        for child in self._children:
+            if offset < len(child.expanded_text):
+                return (child, offset)
+            offset -= len(child.expanded_text)
+
+    def select_range(self, start, end):
+        start_child, start_child_offset = self._get_child_and_child_offset(start)
+        end_child, end_child_offset = self._get_child_and_child_offset(end)
+        if start_child == end_child and not start_child.is_leaf:
+            # Selection is fully contained within a child node.
+            return start_child.select_range(start_child_offset, end_child_offset)
+        if not start_child.is_leaf or not end_child.is_leaf:
+            # Selection cannot be made within a single node, which is the only
+            # widely supported API.
+            return False
+        # Selection spans one leaf child to another leaf child.
+        self._text.setSelection(0,
+                                start_child.get_parent_offset(start_child_offset),
+                                end_child.get_parent_offset(end_child_offset))
+        return True
+
 
 class AccessibleTextLeaf(object):
     """Wrapper around a pure-text segment of an IAccessibleText. Mutable methods
@@ -220,6 +243,7 @@ class AccessibleTextLeaf(object):
     DELIMITER = "\x1e"
 
     def __init__(self, accessible_text, text, start, end, cursor_offset):
+        self.is_leaf = True
         self._text = accessible_text
         self.expanded_text = text[start:end] + self.DELIMITER
         self._start = start
@@ -229,12 +253,15 @@ class AccessibleTextLeaf(object):
     def __str__(self):
         return self.expanded_text
 
+    def get_parent_offset(self, offset):
+        return self._start + offset
+
     def set_cursor(self, offset):
         """Sets the cursor to the given offset. Note that the update will not be
         reflected in self.cursor."""
-        self._text.setCaretOffset(self._start + offset)
+        self._text.setCaretOffset(self.get_parent_offset(offset))
 
     def get_bounding_box(self, offset):
         return BoundingBox(*self._text.characterExtents(
-            self._start + offset,
+            self.get_parent_offset(offset),
             pyia2.IA2Lib.IA2_COORDTYPE_SCREEN_RELATIVE))

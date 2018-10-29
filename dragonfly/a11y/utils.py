@@ -1,5 +1,7 @@
 import re
 
+# TODO Reduce duplication throughout this file.
+
 def get_cursor_offset(controller):
     def closure(context):
         if not context.focused:
@@ -80,6 +82,34 @@ def get_text_selection_points(controller, phrase):
             end_box = accessible_text.get_bounding_box(nearest[1] - 1)
             return ((start_box.x, start_box.y + start_box.height / 2),
                     (end_box.x + end_box.width, end_box.y + end_box.height / 2))
+        else:
+            print "Not found: %s" % phrase
+    return controller.run_sync(closure)
+
+def select_text(controller, phrase):
+    print "Selecting text: %s" % phrase
+    def closure(context):
+        if not context.focused:
+            print "Nothing is focused."
+            return None
+        accessible_text = context.focused.as_text()
+        if not accessible_text:
+            print "Focused element is not text."
+            return None
+        regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
+                                           for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
+        matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
+        ranges = [(match.start(), match.end())
+                  for match in matches]
+        if ranges:
+            if accessible_text.cursor is None:
+                print "Warning: cursor not found."
+                nearest = min(ranges)
+            else:
+                nearest = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - accessible_text.cursor))
+            # TODO Implement a better scheme for distinguishing return values.
+            return accessible_text.select_range(*nearest)
+            print "Selected text"
         else:
             print "Not found: %s" % phrase
     return controller.run_sync(closure)
