@@ -59,9 +59,42 @@ def set_cursor_offset(controller, offset):
     controller.run_sync(closure)
 
 
-class CursorPosition(enum.Enum):
-    before = 1
-    after = 2
+class TextInfo(object):
+    def __init__(self, start, end, text, start_coordinates=None, end_coordinates=None):
+        self.start = start
+        self.end = end
+        self.text = text
+        self.start_coordinates = start_coordinates
+        self.end_coordinates = end_coordinates
+
+
+def get_text_info(controller, phrase):
+    print "Getting text info: %s" % phrase
+    def closure(context):
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return None
+        nearest = _get_nearest_range(focused_text, phrase)
+        if not nearest:
+            return None
+        text_info = TextInfo(nearest[0], nearest[1],
+                             focused_text.expanded_text[nearest[0]:nearest[1]])
+        start_box = focused_text.get_bounding_box(nearest[0])
+        end_box = focused_text.get_bounding_box(nearest[1] - 1)
+        # Ignore offscreen coordinates. Google Docs returns these, and we handle
+        # it here to avoid further trouble.
+        if start_box.x < 0 or start_box.y < 0 or end_box.x < 0 or end_box.y < 0:
+            print "Text selection points were offscreen, ignoring."
+        else:
+            text_info.start_coordinates = start_box.x, start_box.y + start_box.height / 2
+            text_info.end_coordinates = end_box.x + end_box.width, end_box.y + end_box.height / 2
+        return text_info
+    return controller.run_sync(closure)
+
+
+class Position(enum.Enum):
+    start = 1
+    end = 2
 
 
 def move_cursor(controller, phrase, position):
@@ -75,37 +108,9 @@ def move_cursor(controller, phrase, position):
         nearest = _get_nearest_range(focused_text, phrase)
         if not nearest:
             return False
-        focused_text.set_cursor(nearest[0] if position is CursorPosition.before else nearest[1])
+        focused_text.set_cursor(nearest[0] if position is Position.start else nearest[1])
         print "Moved cursor"
         return True
-    return controller.run_sync(closure)
-
-
-def get_text_selection_points(controller, phrase):
-    """Gets the starting and ending selection points needed to select the provided
-    phrase. This uses mouse-based selection instead of the built-in selection
-    system because support for this system is spotty when selecting across
-    multiple objects. In Firefox you get results that look right, but the
-    selection doesn't behave like a normal selection. Chrome simply does not
-    support selections across multiple objects."""
-
-    print "Getting text selection points: %s" % phrase
-    def closure(context):
-        focused_text = _get_focused_text(context)
-        if not focused_text:
-            return None
-        nearest = _get_nearest_range(focused_text, phrase)
-        if not nearest:
-            return None
-        start_box = focused_text.get_bounding_box(nearest[0])
-        end_box = focused_text.get_bounding_box(nearest[1] - 1)
-        # Ignore offscreen coordinates. Google Docs returns these, and we handle
-        # it here to avoid further trouble.
-        if start_box.x < 0 or start_box.y < 0 or end_box.x < 0 or end_box.y < 0:
-            print "Text selection points were offscreen, ignoring."
-            return None
-        return ((start_box.x, start_box.y + start_box.height / 2),
-                (end_box.x + end_box.width, end_box.y + end_box.height / 2))
     return controller.run_sync(closure)
 
 
