@@ -63,6 +63,7 @@ setup(
                         "pywin32;platform_system=='Windows'",
                         "six",
                         "pyperclip >= 1.7.0"
+                        "enum34;python_version<'3.4'"
                        ],
 
       extras_require={

@@ -4,6 +4,8 @@ import threading
 import traceback
 import time
 
+from . import base
+
 
 class Controller(object):
     """Provides access to the IAccessible2 subsystem. All accesses to this subsystem
@@ -85,6 +87,10 @@ class Controller(object):
                     break
                 try:
                     capture.return_value = capture.closure(self._context)
+                except base.AccessibilityError as exception:
+                    capture.exception = exception
+                    # Checked exception, don't print.
+                    pass
                 except Exception as exception:
                     capture.exception = exception
                     # The stack trace won't be captured, so print here.
@@ -223,16 +229,16 @@ class AccessibleTextNode(object):
         end_child, end_child_offset = self._get_child_and_child_offset(end)
         if start_child == end_child and not start_child.is_leaf:
             # Selection is fully contained within a child node.
-            return start_child.select_range(start_child_offset, end_child_offset)
+            start_child.select_range(start_child_offset, end_child_offset)
+            return
         if not start_child.is_leaf or not end_child.is_leaf:
             # Selection cannot be made within a single node, which is the only
             # widely supported API.
-            return False
+            raise base.UnsupportedSelectionError()
         # Selection spans one leaf child to another leaf child.
         self._text.setSelection(0,
                                 start_child.get_parent_offset(start_child_offset),
                                 end_child.get_parent_offset(end_child_offset))
-        return True
 
 
 class AccessibleTextLeaf(object):

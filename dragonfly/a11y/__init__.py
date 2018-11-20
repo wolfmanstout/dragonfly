@@ -1,6 +1,8 @@
 import sys
 from contextlib import contextmanager
 
+from .base import *
+
 if sys.platform.startswith("win"):
     from . import ia2
     controller_class = ia2.Controller

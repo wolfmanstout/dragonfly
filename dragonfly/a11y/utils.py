@@ -1,53 +1,70 @@
 import re
+import enum
 
-# TODO Reduce duplication throughout this file.
+def _get_focused_text(context):
+    if not context.focused:
+        print "Nothing is focused."
+        return None
+    focused_text = context.focused.as_text()
+    if not focused_text:
+        print "Focused element is not text."
+        return None
+    return focused_text
+
+
+def _get_nearest_range(focused_text, phrase):
+    regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
+                                       for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
+    matches = re.finditer(regex, focused_text.expanded_text, re.IGNORECASE)
+    ranges = [(match.start(), match.end()) for match in matches]
+    if not ranges:
+        print "Not found: %s" % phrase
+        return None
+    if not focused_text.cursor:
+        print "Warning: cursor not found."
+        return min(ranges)
+    else:
+        return min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - focused_text.cursor))
+
 
 def get_cursor_offset(controller):
     def closure(context):
-        if not context.focused:
-            print "Nothing is focused."
-            return
-        return context.focused.as_text().cursor
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return None
+        return focused_text.cursor
     return controller.run_sync(closure)
 
 
 def set_cursor_offset(controller, offset):
     def closure(context):
-        if not context.focused:
-            print "Nothing is focused."
-            return
-        context.focused.as_text().set_cursor(offset)
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return None
+        focused_text.set_cursor(offset)
     controller.run_sync(closure)
 
 
-def move_cursor(controller, phrase, before=False):
+class CursorPosition(enum.Enum):
+    before = 1
+    after = 2
+
+
+def move_cursor(controller, phrase, position):
     """Moves the cursor before or after the provided phrase."""
 
-    print "Moving cursor %s phrase: %s" % ("before" if before else "after", phrase)
+    print "Moving cursor %s phrase: %s" % (position.name, phrase)
     def closure(context):
-        if not context.focused:
-            print "Nothing is focused."
-            return
-        accessible_text = context.focused.as_text()
-        if not accessible_text:
-            print "Focused element is not text."
-            return
-        regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
-                                            for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
-        matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
-        indices = [match.start() if before else match.end()
-                   for match in matches]
-        if indices:
-            if accessible_text.cursor is None:
-                print "Warning: cursor not found."
-                nearest = min(indices)
-            else:
-                nearest = min(indices, key=lambda x: abs(x - accessible_text.cursor))
-            accessible_text.set_cursor(nearest)
-            print "Moved cursor"
-        else:
-            print "Not found: %s" % phrase
-    controller.run_sync(closure)
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return False
+        nearest = _get_nearest_range(focused_text, phrase)
+        if not nearest:
+            return False
+        focused_text.set_cursor(nearest[0] if position is CursorPosition.before else nearest[1])
+        print "Moved cursor"
+        return True
+    return controller.run_sync(closure)
 
 
 def get_text_selection_points(controller, phrase):
@@ -60,58 +77,31 @@ def get_text_selection_points(controller, phrase):
 
     print "Getting text selection points: %s" % phrase
     def closure(context):
-        if not context.focused:
-            print "Nothing is focused."
-            return
-        accessible_text = context.focused.as_text()
-        if not accessible_text:
-            print "Focused element is not text."
-            return
-        regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
-                                           for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
-        matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
-        ranges = [(match.start(), match.end())
-                  for match in matches]
-        if ranges:
-            if accessible_text.cursor is None:
-                print "Warning: cursor not found."
-                nearest = min(ranges)
-            else:
-                nearest = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - accessible_text.cursor))
-            start_box = accessible_text.get_bounding_box(nearest[0])
-            end_box = accessible_text.get_bounding_box(nearest[1] - 1)
-            return ((start_box.x, start_box.y + start_box.height / 2),
-                    (end_box.x + end_box.width, end_box.y + end_box.height / 2))
-        else:
-            print "Not found: %s" % phrase
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return None
+        nearest = _get_nearest_range(focused_text, phrase)
+        if not nearest:
+            return None
+        start_box = focused_text.get_bounding_box(nearest[0])
+        end_box = focused_text.get_bounding_box(nearest[1] - 1)
+        return ((start_box.x, start_box.y + start_box.height / 2),
+                (end_box.x + end_box.width, end_box.y + end_box.height / 2))
     return controller.run_sync(closure)
+
 
 def select_text(controller, phrase):
     print "Selecting text: %s" % phrase
     def closure(context):
-        if not context.focused:
-            print "Nothing is focused."
-            return None
-        accessible_text = context.focused.as_text()
-        if not accessible_text:
-            print "Focused element is not text."
-            return None
-        regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
-                                           for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
-        matches = re.finditer(regex, accessible_text.expanded_text, re.IGNORECASE)
-        ranges = [(match.start(), match.end())
-                  for match in matches]
-        if ranges:
-            if accessible_text.cursor is None:
-                print "Warning: cursor not found."
-                nearest = min(ranges)
-            else:
-                nearest = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - accessible_text.cursor))
-            # TODO Implement a better scheme for distinguishing return values.
-            return accessible_text.select_range(*nearest)
-            print "Selected text"
-        else:
-            print "Not found: %s" % phrase
+        focused_text = _get_focused_text(context)
+        if not focused_text:
+            return False
+        nearest = _get_nearest_range(focused_text, phrase)
+        if not nearest:
+            return False
+        focused_text.select_range(*nearest)
+        print "Selected text"
+        return True
     return controller.run_sync(closure)
 
 
