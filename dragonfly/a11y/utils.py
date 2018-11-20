@@ -13,18 +13,32 @@ def _get_focused_text(context):
 
 
 def _get_nearest_range(focused_text, phrase):
+    until = phrase.startswith("until ")
+    if until:
+        phrase = phrase[len("until "):]
     regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
-                                       for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
+                                        for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
     matches = re.finditer(regex, focused_text.expanded_text, re.IGNORECASE)
     ranges = [(match.start(), match.end()) for match in matches]
     if not ranges:
         print "Not found: %s" % phrase
         return None
-    if not focused_text.cursor:
+    if focused_text.cursor is None:
         print "Warning: cursor not found."
-        return min(ranges)
+        if until:
+            print "Cannot get range without cursor."
+            return None
+        else:
+            return min(ranges)
     else:
-        return min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - focused_text.cursor))
+        range = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - focused_text.cursor))
+        if until:
+            if range[0] < focused_text.cursor:
+                return (range[0], focused_text.cursor)
+            else:
+                return (focused_text.cursor, range[1])
+        else:
+            return range
 
 
 def get_cursor_offset(controller):
@@ -85,6 +99,11 @@ def get_text_selection_points(controller, phrase):
             return None
         start_box = focused_text.get_bounding_box(nearest[0])
         end_box = focused_text.get_bounding_box(nearest[1] - 1)
+        # Ignore offscreen coordinates. Google Docs returns these, and we handle
+        # it here to avoid further trouble.
+        if start_box.x < 0 or start_box.y < 0 or end_box.x < 0 or end_box.y < 0:
+            print "Text selection points were offscreen, ignoring."
+            return None
         return ((start_box.x, start_box.y + start_box.height / 2),
                 (end_box.x + end_box.width, end_box.y + end_box.height / 2))
     return controller.run_sync(closure)
