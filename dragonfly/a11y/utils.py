@@ -4,46 +4,48 @@ import enum
 # TODO Change prints into log statements
 
 
+class Position(enum.Enum):
+    """The cursor position relative to a range of text."""
+
+    before = 1
+    after = 2
+
+
 class TextQuery(object):
     """A query to match a range of text."""
-    
-    def __init__(self,
-                 full_phrase="",
-                 start_phrase="",
-                 end_phrase="",
-                 start_before=False,
-                 start_after=False,
-                 end_before=False,
-                 end_after=False):
-        if full_phrase and (start_phrase or end_phrase):
-            raise ValueError("Cannot specify both full phrase and start or end")
-        if start_phrase and not end_phrase:
-            raise ValueError("Cannot specify only start phrase")
-        if start_before and start_after or end_before and end_after:
-            raise ValueError("Inconsistent before/after values")
 
-        self.full_phrase = full_phrase
+    def __init__(self,
+                 start_phrase="",
+                 start_relative_position=None,
+                 start_relative_phrase="",
+                 through=False,
+                 end_phrase="",
+                 end_relative_position=None,
+                 end_relative_phrase=""):
+        if not (end_phrase or end_relative_phrase):
+            raise ValueError("Must specify end (relative) phrase")
+        if not through and (start_phrase or start_relative_phrase):
+            raise ValueError("Must specify 'through' if start is specified.")
+        if start_relative_phrase and not start_relative_position:
+            raise ValueError("Must specify before or after for start_relative_phrase")
+        if end_relative_phrase and not end_relative_position:
+            raise ValueError("Must specify before or after for end_relative_phrase")
+
         self.start_phrase = start_phrase
+        self.start_relative_position = start_relative_position
+        self.start_relative_phrase = start_relative_phrase
+        self.through = through
         self.end_phrase = end_phrase
-        self.start_before = start_before
-        self.start_after = start_after
-        self.end_before = end_before
-        self.end_after = end_after
+        self.end_relative_position = end_relative_position
+        self.end_relative_phrase = end_relative_phrase
 
     def __str__(self):
         return str(dict([(k, v) for (k, v) in self.__dict__.items() if v]))
-        
-
-class Position(enum.Enum):
-    """The cursor position relative to a range of text."""
-    
-    start = 1
-    end = 2
 
 
 class TextInfo(object):
     """Information about a range of text."""
-    
+
     def __init__(self, start, end, text, start_coordinates=None, end_coordinates=None):
         self.start = start
         self.end = end
@@ -52,49 +54,69 @@ class TextInfo(object):
         self.end_coordinates = end_coordinates
 
 
-def _phrase_to_regex(phrase, before=False, after=False):
-    assert not (before and after)
-    
+def _phrase_to_regex(phrase):
     # Treat whitespace between words as meaning anything other than alphanumeric
     # characters.
     regex = r"[^A-Za-z0-9]+".join(re.escape(word) for word in phrase.split())
     # Explicitly match whitespace at the beginning and end of the phrase.
-    if phrase.startswith(" "):
-        regex = r"\s+" + regex
-    if phrase.endswith(" "):
-        regex = regex + r"\s+"
-    # Only match at boundaries of alphanumeric sequences if the boundary is
-    # alphanumeric.
+    if phrase == " ":
+        regex = r"\s+"
+    else:
+        if phrase.startswith(" "):
+            regex = r"\s+" + regex
+        if phrase.endswith(" "):
+            regex = regex + r"\s+"
+    # Only match at boundaries of alphanumeric sequences if the phrase ends
+    # are alphanumeric.
     if re.search(r"^[A-Za-z0-9]", phrase):
         regex = r"(?<![A-Za-z0-9])" + regex
     if re.search(r"[A-Za-z0-9]$", phrase):
         regex = regex + r"(?![A-Za-z0-9])"
-    if before:
-        regex = r"(?=" + regex + r")"
-    if after:
-        regex = r"(?<=" + regex + r")"
     return regex
 
-    
+
 def _find_text(query, expanded_text, cursor_offset):
-    # Convert query to regex.
-    start_with_cursor = query.end_phrase and not query.start_phrase
-    if query.full_phrase:
-        regex = _phrase_to_regex(query.full_phrase)
-    elif start_with_cursor:
-        regex = _phrase_to_regex(query.end_phrase, query.end_before, query.end_after)
-    else:
-        assert query.start_phrase and query.end_phrase
-        regex = (_phrase_to_regex(query.start_phrase, query.start_before, query.start_after) +
-                 r".*?" +
-                 _phrase_to_regex(query.end_phrase, query.end_before, query.end_after))
+    # Convert query to regex with a single matching group. Note that this used
+    # to be simpler but buggy, and is now is complicated because lookbehind and
+    # lookahead regular expressions must be fixed-width, so we have to limit
+    # their usage and use a matching group instead, which requires matching up
+    # the parens surrounding the group.
+    regex = ""
+
+    # Add the start phrases, if present. 
+    if query.start_phrase or query.start_relative_phrase:
+        if query.start_relative_phrase and query.start_relative_position == Position.after:
+            regex += _phrase_to_regex(query.start_relative_phrase)
+            if query.start_phrase:
+                regex += r"[^A-Za-z0-9]*"
+        regex += r"(" + _phrase_to_regex(query.start_phrase)
+        if query.start_relative_phrase and query.start_relative_position == Position.before:
+            if query.start_phrase:
+                regex += r"[^A-Za-z0-9]*"
+            regex += _phrase_to_regex(query.start_relative_phrase)
+        regex += ".*?"
+
+    # Add the end phrases.
+    if query.end_relative_phrase and query.end_relative_position == Position.after:
+        regex += _phrase_to_regex(query.end_relative_phrase)
+        if query.end_phrase:
+            regex += r"[^A-Za-z0-9]*"
+    # Add the initial "(" if we haven't already.
+    if not (query.start_phrase or query.start_relative_phrase):
+        regex += "("
+    regex += _phrase_to_regex(query.end_phrase) + ")"
+    if query.end_relative_phrase and query.end_relative_position == Position.before:
+        if query.end_phrase:
+            regex += r"[^A-Za-z0-9]*"
+        regex += _phrase_to_regex(query.end_relative_phrase)
 
     # Find all matches.
     matches = re.finditer(regex, expanded_text, re.IGNORECASE)
-    ranges = [(match.start(), match.end()) for match in matches]
+    ranges = [(match.start(1), match.end(1)) for match in matches]
     if not ranges:
         print "Not found: %s" % query
         return None
+    start_with_cursor = (query.through and not (query.start_phrase or query.start_relative_phrase))
     if cursor_offset is None:
         print "Warning: cursor not found."
         if start_with_cursor:
@@ -179,7 +201,7 @@ def move_cursor(controller, query, position):
         nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return False
-        focused_text.set_cursor(nearest[0] if position is Position.start else nearest[1])
+        focused_text.set_cursor(nearest[0] if position is Position.before else nearest[1])
         print "Moved cursor"
         return True
     return controller.run_sync(closure)
