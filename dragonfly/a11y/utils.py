@@ -1,6 +1,110 @@
 import re
 import enum
 
+# TODO Change prints into log statements
+
+
+class TextQuery(object):
+    """A query to match a range of text."""
+    
+    def __init__(self,
+                 full_phrase="",
+                 start_phrase="",
+                 end_phrase="",
+                 start_before=False,
+                 start_after=False,
+                 end_before=False,
+                 end_after=False):
+        if full_phrase and (start_phrase or end_phrase):
+            raise ValueError("Cannot specify both full phrase and start or end")
+        if start_phrase and not end_phrase:
+            raise ValueError("Cannot specify only start phrase")
+        if start_before and start_after or end_before and end_after:
+            raise ValueError("Inconsistent before/after values")
+
+        self.full_phrase = full_phrase
+        self.start_phrase = start_phrase
+        self.end_phrase = end_phrase
+        self.start_before = start_before
+        self.start_after = start_after
+        self.end_before = end_before
+        self.end_after = end_after
+
+    def __str__(self):
+        return str(dict([(k, v) for (k, v) in self.__dict__.items() if v]))
+        
+
+class Position(enum.Enum):
+    """The cursor position relative to a range of text."""
+    
+    start = 1
+    end = 2
+
+
+class TextInfo(object):
+    """Information about a range of text."""
+    
+    def __init__(self, start, end, text, start_coordinates=None, end_coordinates=None):
+        self.start = start
+        self.end = end
+        self.text = text
+        self.start_coordinates = start_coordinates
+        self.end_coordinates = end_coordinates
+
+
+def _phrase_to_regex(phrase, before=False, after=False):
+    assert not (before and after)
+    
+    # Treat whitespace as meaning anything other than alphanumeric characters.
+    regex = r"[^A-Za-z0-9]+".join(re.escape(word) for word in phrase.split())
+    # Only match at boundaries of alphanumeric sequences.
+    regex = r"(?<![A-Za-z0-9])" + regex + r"(?![A-Za-z0-9])"
+    if before:
+        regex = r"(?=" + regex + r")"
+    if after:
+        regex = r"(?<=" + regex + r")"
+    return regex
+
+    
+def _find_text(query, expanded_text, cursor_offset):
+    # Convert query to regex.
+    start_with_cursor = query.end_phrase and not query.start_phrase
+    if query.full_phrase:
+        regex = _phrase_to_regex(query.full_phrase)
+    elif start_with_cursor:
+        regex = _phrase_to_regex(query.end_phrase, query.end_before, query.end_after)
+    else:
+        assert query.start_phrase and query.end_phrase
+        regex = (_phrase_to_regex(query.start_phrase, query.start_before, query.start_after) +
+                 r".*?" +
+                 _phrase_to_regex(query.end_phrase, query.end_before, query.end_after))
+
+    # Find all matches.
+    matches = re.finditer(regex, expanded_text, re.IGNORECASE)
+    ranges = [(match.start(), match.end()) for match in matches]
+    if not ranges:
+        print "Not found: %s" % query
+        return None
+    if cursor_offset is None:
+        print "Warning: cursor not found."
+        if start_with_cursor:
+            print "Cannot get range without cursor."
+            return None
+        else:
+            # Pick arbitrary match (the first one).
+            return ranges[0]
+    else:
+        # Find nearest match.
+        range = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - cursor_offset))
+        if start_with_cursor:
+            if range[0] < cursor_offset:
+                return (range[0], cursor_offset)
+            else:
+                return (cursor_offset, range[1])
+        else:
+            return range
+
+
 def _get_focused_text(context):
     if not context.focused:
         print "Nothing is focused."
@@ -10,35 +114,6 @@ def _get_focused_text(context):
         print "Focused element is not text."
         return None
     return focused_text
-
-
-def _get_nearest_range(focused_text, phrase):
-    until = phrase.startswith("until ")
-    if until:
-        phrase = phrase[len("until "):]
-    regex = r"\b" + (r"[^A-Za-z]+".join(re.escape(word) if word != "through" else ".*?"
-                                        for word in re.split(r"[^A-Za-z]+", phrase))) + r"\b"
-    matches = re.finditer(regex, focused_text.expanded_text, re.IGNORECASE)
-    ranges = [(match.start(), match.end()) for match in matches]
-    if not ranges:
-        print "Not found: %s" % phrase
-        return None
-    if focused_text.cursor is None:
-        print "Warning: cursor not found."
-        if until:
-            print "Cannot get range without cursor."
-            return None
-        else:
-            return min(ranges)
-    else:
-        range = min(ranges, key=lambda x: abs((x[0] + x[1]) / 2 - focused_text.cursor))
-        if until:
-            if range[0] < focused_text.cursor:
-                return (range[0], focused_text.cursor)
-            else:
-                return (focused_text.cursor, range[1])
-        else:
-            return range
 
 
 def get_cursor_offset(controller):
@@ -59,22 +134,13 @@ def set_cursor_offset(controller, offset):
     controller.run_sync(closure)
 
 
-class TextInfo(object):
-    def __init__(self, start, end, text, start_coordinates=None, end_coordinates=None):
-        self.start = start
-        self.end = end
-        self.text = text
-        self.start_coordinates = start_coordinates
-        self.end_coordinates = end_coordinates
-
-
-def get_text_info(controller, phrase):
-    print "Getting text info: %s" % phrase
+def get_text_info(controller, query):
+    print "Getting text info: %s" % query
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
             return None
-        nearest = _get_nearest_range(focused_text, phrase)
+        nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return None
         text_info = TextInfo(nearest[0], nearest[1],
@@ -92,20 +158,15 @@ def get_text_info(controller, phrase):
     return controller.run_sync(closure)
 
 
-class Position(enum.Enum):
-    start = 1
-    end = 2
-
-
-def move_cursor(controller, phrase, position):
+def move_cursor(controller, query, position):
     """Moves the cursor before or after the provided phrase."""
 
-    print "Moving cursor %s phrase: %s" % (position.name, phrase)
+    print "Moving cursor %s phrase: %s" % (position.name, query)
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
             return False
-        nearest = _get_nearest_range(focused_text, phrase)
+        nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return False
         focused_text.set_cursor(nearest[0] if position is Position.start else nearest[1])
@@ -114,13 +175,13 @@ def move_cursor(controller, phrase, position):
     return controller.run_sync(closure)
 
 
-def select_text(controller, phrase):
-    print "Selecting text: %s" % phrase
+def select_text(controller, query):
+    print "Selecting text: %s" % query
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
             return False
-        nearest = _get_nearest_range(focused_text, phrase)
+        nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return False
         focused_text.select_range(*nearest)
