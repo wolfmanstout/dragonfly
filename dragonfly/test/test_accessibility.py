@@ -22,6 +22,15 @@ class AccessibilityTestCase(unittest.TestCase):
         self.assert_found_text("elephant",
                                utils.TextQuery(full_phrase="elephant"),
                                "dog elephant tiger")
+        self.assert_found_text("elephant ",
+                               utils.TextQuery(full_phrase="elephant "),
+                               "dog elephant tiger")
+        self.assert_found_text("elephant.  ",
+                               utils.TextQuery(full_phrase="elephant. "),
+                               "dog elephant.  tiger")
+        self.assert_found_text(" elephant",
+                               utils.TextQuery(full_phrase=" elephant"),
+                               "dog elephant tiger")
         self.assert_found_text("dog.",
                                utils.TextQuery(full_phrase="dog."),
                                "dog.elephant")

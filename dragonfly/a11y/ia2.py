@@ -246,6 +246,7 @@ class AccessibleTextLeaf(object):
     will affect the underlying IAccessibleText, but the changes will not be
     reflected here."""
 
+    # TODO Use something printable for debugging.
     DELIMITER = "\x1e"
 
     def __init__(self, accessible_text, text, start, end, cursor_offset):

@@ -55,8 +55,14 @@ class TextInfo(object):
 def _phrase_to_regex(phrase, before=False, after=False):
     assert not (before and after)
     
-    # Treat whitespace as meaning anything other than alphanumeric characters.
+    # Treat whitespace between words as meaning anything other than alphanumeric
+    # characters.
     regex = r"[^A-Za-z0-9]+".join(re.escape(word) for word in phrase.split())
+    # Explicitly match whitespace at the beginning and end of the phrase.
+    if phrase.startswith(" "):
+        regex = r"\s+" + regex
+    if phrase.endswith(" "):
+        regex = regex + r"\s+"
     # Only match at boundaries of alphanumeric sequences if the boundary is
     # alphanumeric.
     if re.search(r"^[A-Za-z0-9]", phrase):
