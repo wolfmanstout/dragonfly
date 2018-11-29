@@ -57,8 +57,12 @@ def _phrase_to_regex(phrase, before=False, after=False):
     
     # Treat whitespace as meaning anything other than alphanumeric characters.
     regex = r"[^A-Za-z0-9]+".join(re.escape(word) for word in phrase.split())
-    # Only match at boundaries of alphanumeric sequences.
-    regex = r"(?<![A-Za-z0-9])" + regex + r"(?![A-Za-z0-9])"
+    # Only match at boundaries of alphanumeric sequences if the boundary is
+    # alphanumeric.
+    if re.search(r"^[A-Za-z0-9]", phrase):
+        regex = r"(?<![A-Za-z0-9])" + regex
+    if re.search(r"[A-Za-z0-9]$", phrase):
+        regex = regex + r"(?![A-Za-z0-9])"
     if before:
         regex = r"(?=" + regex + r")"
     if after:
