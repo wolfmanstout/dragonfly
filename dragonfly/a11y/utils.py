@@ -1,14 +1,16 @@
 import re
 import enum
+import logging
 
-# TODO Change prints into log statements
+
+_log = logging.getLogger("accessibility")
 
 
 class Position(enum.Enum):
     """The cursor position relative to a range of text."""
 
-    before = 1
-    after = 2
+    BEFORE = 1
+    AFTER = 2
 
 
 class TextQuery(object):
@@ -85,19 +87,19 @@ def _find_text(query, expanded_text, cursor_offset):
 
     # Add the start phrases, if present. 
     if query.start_phrase or query.start_relative_phrase:
-        if query.start_relative_phrase and query.start_relative_position == Position.after:
+        if query.start_relative_phrase and query.start_relative_position == Position.AFTER:
             regex += _phrase_to_regex(query.start_relative_phrase)
             if query.start_phrase:
                 regex += r"[^A-Za-z0-9]*"
         regex += r"(" + _phrase_to_regex(query.start_phrase)
-        if query.start_relative_phrase and query.start_relative_position == Position.before:
+        if query.start_relative_phrase and query.start_relative_position == Position.BEFORE:
             if query.start_phrase:
                 regex += r"[^A-Za-z0-9]*"
             regex += _phrase_to_regex(query.start_relative_phrase)
         regex += ".*?"
 
     # Add the end phrases.
-    if query.end_relative_phrase and query.end_relative_position == Position.after:
+    if query.end_relative_phrase and query.end_relative_position == Position.AFTER:
         regex += _phrase_to_regex(query.end_relative_phrase)
         if query.end_phrase:
             regex += r"[^A-Za-z0-9]*"
@@ -105,7 +107,7 @@ def _find_text(query, expanded_text, cursor_offset):
     if not (query.start_phrase or query.start_relative_phrase):
         regex += "("
     regex += _phrase_to_regex(query.end_phrase) + ")"
-    if query.end_relative_phrase and query.end_relative_position == Position.before:
+    if query.end_relative_phrase and query.end_relative_position == Position.BEFORE:
         if query.end_phrase:
             regex += r"[^A-Za-z0-9]*"
         regex += _phrase_to_regex(query.end_relative_phrase)
@@ -114,13 +116,13 @@ def _find_text(query, expanded_text, cursor_offset):
     matches = re.finditer(regex, expanded_text, re.IGNORECASE)
     ranges = [(match.start(1), match.end(1)) for match in matches]
     if not ranges:
-        print "Not found: %s" % query
+        _log.warning("Not found: %s" % query)
         return None
     start_with_cursor = (query.through and not (query.start_phrase or query.start_relative_phrase))
     if cursor_offset is None:
-        print "Warning: cursor not found."
+        _log.warning("Cursor not found.")
         if start_with_cursor:
-            print "Cannot get range without cursor."
+            _log.warning("Cannot perform cursor-relative query without cursor.")
             return None
         else:
             # Pick arbitrary match (the first one).
@@ -139,11 +141,11 @@ def _find_text(query, expanded_text, cursor_offset):
 
 def _get_focused_text(context):
     if not context.focused:
-        print "Nothing is focused."
+        _log.warning("Nothing is focused.")
         return None
     focused_text = context.focused.as_text()
     if not focused_text:
-        print "Focused element is not text."
+        _log.warning("Focused element is not text.")
         return None
     return focused_text
 
@@ -167,7 +169,7 @@ def set_cursor_offset(controller, offset):
 
 
 def get_text_info(controller, query):
-    print "Getting text info: %s" % query
+    _log.debug("Getting text info: %s" % query)
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
@@ -182,7 +184,7 @@ def get_text_info(controller, query):
         # Ignore offscreen coordinates. Google Docs returns these, and we handle
         # it here to avoid further trouble.
         if start_box.x < 0 or start_box.y < 0 or end_box.x < 0 or end_box.y < 0:
-            print "Text selection points were offscreen, ignoring."
+            _log.warning("Text selection points were offscreen, ignoring.")
         else:
             text_info.start_coordinates = start_box.x, start_box.y + start_box.height / 2
             text_info.end_coordinates = end_box.x + end_box.width, end_box.y + end_box.height / 2
@@ -193,7 +195,7 @@ def get_text_info(controller, query):
 def move_cursor(controller, query, position):
     """Moves the cursor before or after the provided phrase."""
 
-    print "Moving cursor %s phrase: %s" % (position.name, query)
+    _log.info("Moving cursor %s phrase: %s" % (position.name, query))
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
@@ -201,14 +203,14 @@ def move_cursor(controller, query, position):
         nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return False
-        focused_text.set_cursor(nearest[0] if position is Position.before else nearest[1])
-        print "Moved cursor"
+        focused_text.set_cursor(nearest[0] if position is Position.BEFORE else nearest[1])
+        _log.info("Moved cursor")
         return True
     return controller.run_sync(closure)
 
 
 def select_text(controller, query):
-    print "Selecting text: %s" % query
+    _log.info("Selecting text: %s" % query)
     def closure(context):
         focused_text = _get_focused_text(context)
         if not focused_text:
@@ -217,7 +219,7 @@ def select_text(controller, query):
         if not nearest:
             return False
         focused_text.select_range(*nearest)
-        print "Selected text"
+        _log.info("Selected text")
         return True
     return controller.run_sync(closure)
 

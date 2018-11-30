@@ -1,3 +1,4 @@
+import logging
 import Queue
 import thread
 import threading
@@ -10,6 +11,8 @@ from . import base
 class Controller(object):
     """Provides access to the IAccessible2 subsystem. All accesses to this subsystem
     must be run in a single thread, which is managed here."""
+
+    _log = logging.getLogger("accessibility")
 
     class Capture(object):
         def __init__(self, closure):
@@ -36,13 +39,13 @@ class Controller(object):
 
         # Get the latest focus event, skipping obsolete events.
         if len(self._focus_queue) > 1:
-            print "Skipping %s focus events." % (len(self._focus_queue) - 1)
+            self._log.debug("Skipping %s focus events." % (len(self._focus_queue) - 1))
         event = self._focus_queue[-1]
         self._focus_queue = []
 
         accessible_start = time.time()
         accessible = pyia2.accessibleObjectFromEvent(event)
-        print "Attempted to convert to accessible: %.10f" % (time.time() - accessible_start)
+        self._log.debug("Attempted to convert to accessible: %.10f" % (time.time() - accessible_start))
         if not accessible:
             self._context.focused = None
             return
@@ -50,13 +53,13 @@ class Controller(object):
         accessible2_start = time.time()
         accessible2 = pyia2.accessible2FromAccessible(accessible,
                                                       pyia2.CHILDID_SELF)
-        print "Attempted to convert to accessible2: %.10f" % (time.time() - accessible2_start)
+        self._log.debug("Attempted to convert to accessible2: %.10f" % (time.time() - accessible2_start))
         if not isinstance(accessible2, pyia2.IA2Lib.IAccessible2):
             self._context.focused = None
             return
 
         self._context.focused = Accessible(accessible2)
-        print "Set focused. accessible2: %s" % accessible2
+        self._log.debug("Set focused. accessible2: %s" % accessible2)
 
     def _start_blocking(self):
         # Import here so that it can be used in a background thread. The import
