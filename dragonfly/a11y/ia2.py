@@ -249,8 +249,10 @@ class AccessibleTextLeaf(object):
     will affect the underlying IAccessibleText, but the changes will not be
     reflected here."""
 
-    # TODO Use something printable for debugging.
-    DELIMITER = "\x1e"
+    # Use a broken vertical bar at the end of the text to delimit it from other
+    # leaf nodes when expanded. This character was chosen because it is
+    # printable and rarely used in practice.
+    DELIMITER = u"\u00a6"
 
     def __init__(self, accessible_text, text, start, end, cursor_offset):
         self.is_leaf = True

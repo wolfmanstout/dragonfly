@@ -113,6 +113,7 @@ def _find_text(query, expanded_text, cursor_offset):
         regex += _phrase_to_regex(query.end_relative_phrase)
 
     # Find all matches.
+    _log.debug(expanded_text)
     matches = re.finditer(regex, expanded_text, re.IGNORECASE)
     ranges = [(match.start(1), match.end(1)) for match in matches]
     if not ranges:
