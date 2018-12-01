@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-from ... import a11y
+from ... import get_accessibility_controller
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
@@ -283,7 +283,7 @@ class GoogleSpeechEngine(EngineBase):
                         break
                 if not success:
                     # Dictate into editable text widget.
-                    if a11y.utils.is_editable_focused(self._controller):
+                    if self._accessibility.is_editable_focused():
                         # TODO Escape transcript.
                         aenea.strict.Text(transcript).execute()
                         self._log.debug("Entered text into editable")
@@ -312,36 +312,35 @@ class GoogleSpeechEngine(EngineBase):
         )
 
         self.connect()
-        with a11y.ConnectA11yController() as controller:
-            self._controller = controller
-            with MicrophoneStream(RATE, CHUNK) as stream:
-                while self._connected:
-                    shutdown_event = threading.Event()
-                    audio_generator = stream.generator(shutdown_event)
-                    requests = (types.StreamingRecognizeRequest(audio_content=content)
-                                for content in audio_generator)
+        self._accessibility = get_accessibility_controller()
+        with MicrophoneStream(RATE, CHUNK) as stream:
+            while self._connected:
+                shutdown_event = threading.Event()
+                audio_generator = stream.generator(shutdown_event)
+                requests = (types.StreamingRecognizeRequest(audio_content=content)
+                            for content in audio_generator)
 
-                    # Add context phrases.
-                    context_phrases = Counter()
-                    for (_, grammar) in self._grammar_wrappers.items():
-                        # window = Window.get_foreground()
-                        # grammar.process_begin(window.executable, window.title,
-                        #                       window.handle)
-                        grammar.process_begin("", "", "")
-                        for rule in grammar._rules:
-                            if not rule.active or not rule.exported: continue
-                            context_phrases.update(rule.element.context_phrases())
-                    config = streaming_config.config
-                    del config.speech_contexts[:]
-                    speech_context = config.speech_contexts.add()
-                    self._log.debug("Total phrases: %s", len(context_phrases))
-                    # The API currently restricts to max 500 phrases as of 11/4/2017.
-                    speech_context.phrases.extend(
-                        sorted(w for w, c in context_phrases.most_common(500)))
-                    # self._log.debug("Phrases: %s", speech_context.phrases)
+                # Add context phrases.
+                context_phrases = Counter()
+                for (_, grammar) in self._grammar_wrappers.items():
+                    # window = Window.get_foreground()
+                    # grammar.process_begin(window.executable, window.title,
+                    #                       window.handle)
+                    grammar.process_begin("", "", "")
+                    for rule in grammar._rules:
+                        if not rule.active or not rule.exported: continue
+                        context_phrases.update(rule.element.context_phrases())
+                config = streaming_config.config
+                del config.speech_contexts[:]
+                speech_context = config.speech_contexts.add()
+                self._log.debug("Total phrases: %s", len(context_phrases))
+                # The API currently restricts to max 500 phrases as of 11/4/2017.
+                speech_context.phrases.extend(
+                    sorted(w for w, c in context_phrases.most_common(500)))
+                # self._log.debug("Phrases: %s", speech_context.phrases)
 
-                    responses = client.streaming_recognize(streaming_config, requests)
+                responses = client.streaming_recognize(streaming_config, requests)
 
-                    # Now, put the transcription responses to use.
-                    if not self.process_responses(responses, shutdown_event):
-                        return
+                # Now, put the transcription responses to use.
+                if not self.process_responses(responses, shutdown_event):
+                    return
