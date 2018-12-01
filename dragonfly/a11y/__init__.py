@@ -13,6 +13,7 @@ else:
 
 controller = None
 
+# TODO Fix naming.
 def GetA11yController():
     global controller
     if not controller:
