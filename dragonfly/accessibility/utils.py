@@ -1,3 +1,11 @@
+"""This module contains OS-independent functionality *which does not depend on
+other Dragonfly functionality*. Functionality which does depend on Dragonfly
+classes such as actions should go into controller.py. This separation is done to
+make it easier in the future to extract this functionality as a general Python
+library independent of Dragonfly.
+"""
+
+
 import re
 import enum
 import logging
@@ -6,7 +14,7 @@ import logging
 _log = logging.getLogger("accessibility")
 
 
-class Position(enum.Enum):
+class CursorPosition(enum.Enum):
     """The cursor position relative to a range of text."""
 
     BEFORE = 1
@@ -87,19 +95,19 @@ def _find_text(query, expanded_text, cursor_offset):
 
     # Add the start phrases, if present. 
     if query.start_phrase or query.start_relative_phrase:
-        if query.start_relative_phrase and query.start_relative_position == Position.AFTER:
+        if query.start_relative_phrase and query.start_relative_position == CursorPosition.AFTER:
             regex += _phrase_to_regex(query.start_relative_phrase)
             if query.start_phrase:
                 regex += r"[^A-Za-z0-9]*"
         regex += r"(" + _phrase_to_regex(query.start_phrase)
-        if query.start_relative_phrase and query.start_relative_position == Position.BEFORE:
+        if query.start_relative_phrase and query.start_relative_position == CursorPosition.BEFORE:
             if query.start_phrase:
                 regex += r"[^A-Za-z0-9]*"
             regex += _phrase_to_regex(query.start_relative_phrase)
         regex += ".*?"
 
     # Add the end phrases.
-    if query.end_relative_phrase and query.end_relative_position == Position.AFTER:
+    if query.end_relative_phrase and query.end_relative_position == CursorPosition.AFTER:
         regex += _phrase_to_regex(query.end_relative_phrase)
         if query.end_phrase:
             regex += r"[^A-Za-z0-9]*"
@@ -107,7 +115,7 @@ def _find_text(query, expanded_text, cursor_offset):
     if not (query.start_phrase or query.start_relative_phrase):
         regex += "("
     regex += _phrase_to_regex(query.end_phrase) + ")"
-    if query.end_relative_phrase and query.end_relative_position == Position.BEFORE:
+    if query.end_relative_phrase and query.end_relative_position == CursorPosition.BEFORE:
         if query.end_phrase:
             regex += r"[^A-Za-z0-9]*"
         regex += _phrase_to_regex(query.end_relative_phrase)
@@ -203,7 +211,7 @@ def move_cursor(controller, query, position):
         nearest = _find_text(query, focused_text.expanded_text, focused_text.cursor)
         if not nearest:
             return False
-        focused_text.set_cursor(nearest[0] if position is Position.BEFORE else nearest[1])
+        focused_text.set_cursor(nearest[0] if position is CursorPosition.BEFORE else nearest[1])
         _log.info("Moved cursor")
         return True
     return controller.run_sync(closure)

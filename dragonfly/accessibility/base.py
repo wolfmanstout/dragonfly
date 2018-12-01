@@ -1,3 +1,8 @@
+"""This module contains any classes or functions which are used by multiple OS
+accessibility controller implementations.
+"""
+
+
 class AccessibilityError(Exception):
     """Base class for checked exceptions."""
 

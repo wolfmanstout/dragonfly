@@ -1,3 +1,8 @@
+"""This file contains the IAccessible2-based accessibility controller
+implementation for Windows.
+"""
+
+
 import logging
 import Queue
 import thread
@@ -140,6 +145,7 @@ class Accessible(object):
     def is_editable(self):
         return pyia2.IA2_STATE_EDITABLE & self._accessible.states
 
+
 class BoundingBox(object):
     """Represents a bounding box in screen coordinates."""
 
@@ -151,6 +157,7 @@ class BoundingBox(object):
 
     def __str__(self):
         return "x=%s, y=%s, width=%s, height=%s" % (self.x, self.y, self.width, self.height)
+
 
 class AccessibleTextNode(object):
     """Provides a wrapper around a snapshot of IAccessibleText. Mutable methods will
@@ -209,6 +216,7 @@ class AccessibleTextNode(object):
     def set_cursor(self, offset):
         """Sets the cursor to the given offset. Note that the update will not be
         reflected in self.cursor."""
+
         for child in self._children:
             if offset < len(child.expanded_text):
                 child.set_cursor(offset)
@@ -271,6 +279,7 @@ class AccessibleTextLeaf(object):
     def set_cursor(self, offset):
         """Sets the cursor to the given offset. Note that the update will not be
         reflected in self.cursor."""
+
         self._text.setCaretOffset(self.get_parent_offset(offset))
 
     def get_bounding_box(self, offset):

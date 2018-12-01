@@ -1,29 +1,25 @@
 import sys
-from contextlib import contextmanager
 
-from .base import *
+from . import controller
+
+from .utils import (CursorPosition, TextQuery)
 
 if sys.platform.startswith("win"):
     from . import ia2
-    controller_class = ia2.Controller
+    os_controller_class = ia2.Controller
 else:
-    # TODO check if Linux.
-    from . import atspi
-    controller_class = atspi.Controller
+    # TODO Support Linux.
+    pass
 
-controller = None
+controller_instance = None
 
-# TODO Fix naming.
-def GetA11yController():
-    global controller
-    if not controller:
-        controller = controller_class()
-        controller.start()
-    return controller
+def get_accessibility_controller():
+    """Get the OS-independent accessibility controller which is the gateway to all
+    accessibility functionality."""
 
-# TODO Rethink ownership model.
-@contextmanager
-def ConnectA11yController():
-    controller = GetA11yController()
-    yield controller
-    controller.stop()
+    global controller_instance
+    if not controller_instance:
+        os_controller = os_controller_class()
+        os_controller.start()
+        controller_instance = controller.AccessibilityController(os_controller)
+    return controller_instance
