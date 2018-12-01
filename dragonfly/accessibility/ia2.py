@@ -5,7 +5,6 @@ implementation for Windows.
 
 import logging
 import Queue
-import thread
 import threading
 import traceback
 import time

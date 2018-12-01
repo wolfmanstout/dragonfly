@@ -65,6 +65,10 @@ To use the CMU Pocket Sphinx engine, see the `relevant documentation
 page <http://dragonfly2.readthedocs.org/en/latest/sphinx_engine.html>`__
 on it.
 
+The accessibility API enables text selection and editing more powerful than what
+Dragon provides natively, to a wider range of applications. To use the this API
+on Windows, install `pyia2 <https://github.com/illinois-dres-aitg/pyia2>`.
+
 Features
 --------
 
