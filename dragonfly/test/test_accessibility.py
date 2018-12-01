@@ -1,6 +1,6 @@
 import unittest
 
-from dragonfly.a11y import utils
+from dragonfly.accessibility import utils
 
 
 class AccessibilityTestCase(unittest.TestCase):
@@ -36,13 +36,13 @@ class AccessibilityTestCase(unittest.TestCase):
                                utils.TextQuery(end_phrase="dog."),
                                "dog.elephant")
         self.assert_found_text("dog",
-                               utils.TextQuery(end_phrase="dog", end_relative_position=utils.Position.before, end_relative_phrase="elephant"),
+                               utils.TextQuery(end_phrase="dog", end_relative_position=utils.CursorPosition.BEFORE, end_relative_phrase="elephant"),
                                "dog elephant tiger")
         self.assert_found_text("elephant",
-                               utils.TextQuery(end_phrase="elephant", end_relative_position=utils.Position.after, end_relative_phrase="dog"),
+                               utils.TextQuery(end_phrase="elephant", end_relative_position=utils.CursorPosition.AFTER, end_relative_phrase="dog"),
                                "dog elephant tiger")
         self.assert_found_text(" ",
-                               utils.TextQuery(end_phrase=" ", end_relative_position=utils.Position.before, end_relative_phrase="elephant"),
+                               utils.TextQuery(end_phrase=" ", end_relative_position=utils.CursorPosition.BEFORE, end_relative_phrase="elephant"),
                                "dog elephant tiger")
 
         # Selecting a range.
@@ -50,22 +50,22 @@ class AccessibilityTestCase(unittest.TestCase):
                                utils.TextQuery(start_phrase="dog", through=True, end_phrase="tiger"),
                                "dog elephant tiger")
         self.assert_found_text("dog elephant tiger",
-                               utils.TextQuery(start_phrase="dog", start_relative_position=utils.Position.before, start_relative_phrase="elephant", through=True, end_phrase="tiger"),
+                               utils.TextQuery(start_phrase="dog", start_relative_position=utils.CursorPosition.BEFORE, start_relative_phrase="elephant", through=True, end_phrase="tiger"),
                                "dog elephant tiger")
         self.assert_found_text("sentence one.",
                                utils.TextQuery(start_phrase="sentence", through=True, end_phrase="."),
                                "sentence one. Sentence two.")
         self.assert_found_text(" one. Sentence two",
-                               utils.TextQuery(start_phrase=" ", start_relative_position=utils.Position.before, start_relative_phrase="one", through=True, end_phrase="two"),
+                               utils.TextQuery(start_phrase=" ", start_relative_position=utils.CursorPosition.BEFORE, start_relative_phrase="one", through=True, end_phrase="two"),
                                "sentence one. Sentence two.")
         self.assert_found_text(" elephant tiger",
-                               utils.TextQuery(start_relative_position=utils.Position.after, start_relative_phrase="dog", through=True, end_phrase="tiger"),
+                               utils.TextQuery(start_relative_position=utils.CursorPosition.AFTER, start_relative_phrase="dog", through=True, end_phrase="tiger"),
                                "doggy dog elephant tiger")
         self.assert_found_text(" elephant tiger",
-                               utils.TextQuery(start_relative_position=utils.Position.after, start_relative_phrase="doggy dog", through=True, end_phrase="tiger"),
+                               utils.TextQuery(start_relative_position=utils.CursorPosition.AFTER, start_relative_phrase="doggy dog", through=True, end_phrase="tiger"),
                                "doggy dog elephant tiger")
         self.assert_found_text("dog elephant tigers ",
-                               utils.TextQuery(start_phrase="dog", through=True, end_relative_position=utils.Position.before, end_relative_phrase="tiger"),
+                               utils.TextQuery(start_phrase="dog", through=True, end_relative_position=utils.CursorPosition.BEFORE, end_relative_phrase="tiger"),
                                "dog elephant tigers tiger")
 
         # Selecting from the cursor position.
@@ -78,11 +78,11 @@ class AccessibilityTestCase(unittest.TestCase):
                                "dog elephant tiger",
                                cursor_offset=-1)
         self.assert_found_text("dog ",
-                               utils.TextQuery(through=True, end_relative_position=utils.Position.before, end_relative_phrase="elephant"),
+                               utils.TextQuery(through=True, end_relative_position=utils.CursorPosition.BEFORE, end_relative_phrase="elephant"),
                                "dog elephant tiger",
                                cursor_offset=0)
         self.assert_found_text(" tiger",
-                               utils.TextQuery(through=True, end_relative_position=utils.Position.after, end_relative_phrase="elephant"),
+                               utils.TextQuery(through=True, end_relative_position=utils.CursorPosition.AFTER, end_relative_phrase="elephant"),
                                "dog elephant tiger",
                                cursor_offset=-1)
 
