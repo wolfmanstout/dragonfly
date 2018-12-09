@@ -145,7 +145,7 @@ def _setup_file_handler():
         else:
             # Use current working directory.
             mydocs_path = ""
-        log_file_path = os.path.join(mydocs_path, "dragonfly.txt")
+        log_file_path = os.path.join(mydocs_path, b"dragonfly.txt")
         _file_handler = logging.FileHandler(log_file_path)
         formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
                                       " %(message)s")

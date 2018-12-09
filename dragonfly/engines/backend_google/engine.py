@@ -5,31 +5,37 @@ import re
 import sys
 import threading
 
-import aenea.config
-import aenea.proxy_contexts
-import aenea.proxy_actions
-import aenea.strict
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
 import inflect
 import pyaudio
 from six.moves import queue
+
+aenea_enabled = False
+try:
+    import aenea.config
+    import aenea.proxy_contexts
+    import aenea.strict
+    aenea_enabled = True
+except Exception as e:
+    # Possible either because Aenea is not available, or because of lack of
+    # Python 3 compatibility.
+    print("engine.py: Unable to import aenea: %s" % e)
+
+win10toast_enabled = False
 try:
     import win10toast
+    win10toast_enabled = True
 except ImportError:
-    pass
+    print("engine.py: Unable to import win10toast")
 
-from ... import get_stopping_accessibility_controller
+from ... import (Text, get_stopping_accessibility_controller)
 from .dictation import GoogleSpeechDictationContainer
 from .timer import SimpleTimerManager
 from ..base import EngineBase
 from ...grammar.state import State
-try:
-    from ...windows.window import Window
-except ImportError:
-    # TODO Fix when not using windows.
-    pass
+from ...windows import Window
 
 
 # Audio recording parameters
@@ -110,7 +116,7 @@ class GoogleSpeechEngine(EngineBase):
         self._connected = False
         self._timer_manager = SimpleTimerManager(0.02, self)
         self._inflect = inflect.engine()
-        self._toaster = win10toast.ToastNotifier() if "win10toast" in sys.modules else None
+        self._toaster = win10toast.ToastNotifier() if win10toast_enabled else None
         self._replacements = {
             r"\b(to|two)\b": ("to", "two"),
             r"\b(for|four)\b": ("for", "four"),
@@ -238,7 +244,7 @@ class GoogleSpeechEngine(EngineBase):
 
     def get_foreground(self):
         """Gets the foreground window information a cross-platform way using Aenea."""
-        if aenea.config.proxy_active():
+        if aenea_enabled and aenea.config.proxy_active():
             context = aenea.proxy_contexts._get_context()
             return dict(title=context["title"], executable=context["executable"], handle="")
         else:
@@ -268,8 +274,8 @@ class GoogleSpeechEngine(EngineBase):
                 if re.match(r"\s*dragonfly close now\s*", transcript, re.I):
                     print('Exiting..')
                     return False
+                context = self.get_foreground()
                 for (_, grammar) in self._grammar_wrappers.items():
-                    context = self.get_foreground()
                     grammar.process_begin(**context)
                 self._log.debug("Prepared grammar")
                 candidates = self.generate_transcripts(transcript)
@@ -285,7 +291,10 @@ class GoogleSpeechEngine(EngineBase):
                     # Dictate into editable text widget.
                     if self._accessibility.is_editable_focused():
                         # TODO Escape transcript.
-                        aenea.strict.Text(transcript).execute()
+                        if aenea_enabled:
+                            aenea.strict.Text(transcript).execute()
+                        else:
+                            Text(transript).execute()
                         self._log.debug("Entered text into editable")
                         success = True
                 if not success:
@@ -323,11 +332,9 @@ class GoogleSpeechEngine(EngineBase):
 
                     # Add context phrases.
                     context_phrases = Counter()
+                    context = self.get_foreground()
                     for (_, grammar) in self._grammar_wrappers.items():
-                        # window = Window.get_foreground()
-                        # grammar.process_begin(window.executable, window.title,
-                        #                       window.handle)
-                        grammar.process_begin("", "", "")
+                        grammar.process_begin(**context)
                         for rule in grammar._rules:
                             if not rule.active or not rule.exported: continue
                             context_phrases.update(rule.element.context_phrases())
