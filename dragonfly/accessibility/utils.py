@@ -18,7 +18,10 @@ class CursorPosition(enum.Enum):
     """The cursor position relative to a range of text."""
 
     BEFORE = 1
+    """The position before the text."""
+
     AFTER = 2
+    """The position after the text."""
 
 
 class TextQuery(object):
@@ -42,12 +45,25 @@ class TextQuery(object):
             raise ValueError("Must specify before or after for end_relative_phrase")
 
         self.start_phrase = start_phrase
+        """The phrase at the start of the match."""
+
         self.start_relative_position = start_relative_position
+        """Whether to match before or after the :attr:`start_relative_phrase`."""
+
         self.start_relative_phrase = start_relative_phrase
+        """The phrase to match before or after at the start."""
+
         self.through = through
+        """True if matching from a start point to the end phrase."""
+
         self.end_phrase = end_phrase
+        """The phrase at the end of the match (or the sole phrase)."""
+
         self.end_relative_position = end_relative_position
+        """Whether to match before or after the :attr:`end_relative_phrase`."""
+
         self.end_relative_phrase = end_relative_phrase
+        """The phrase to match before or after at the end."""
 
     def __str__(self):
         return str(dict([(k, v) for (k, v) in self.__dict__.items() if v]))
@@ -98,7 +114,7 @@ def _find_text(query, expanded_text, cursor_offset):
     # the parens surrounding the group.
     pattern = r""
 
-    # Add the start phrases, if present. 
+    # Add the start phrases, if present.
     if query.start_phrase or query.start_relative_phrase:
         if query.start_relative_phrase and query.start_relative_position == CursorPosition.AFTER:
             pattern += _phrase_to_regex(query.start_relative_phrase)
