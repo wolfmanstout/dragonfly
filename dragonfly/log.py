@@ -125,7 +125,8 @@ def _setup_stdout_handler():
 
     stdout_handler = logging.StreamHandler(_OutputStream(sys.stdout.write))
     stdout_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(name)s: %(message)s")
+    formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
+                                  " %(message)s")
     stdout_handler.setFormatter(formatter)
     return stdout_handler
 
@@ -141,11 +142,14 @@ def _setup_file_handler():
         if shell and shellcon:
             mydocs_pidl = shell.SHGetFolderLocation(0, shellcon.CSIDL_PERSONAL, 0, 0)
             mydocs_path = shell.SHGetPathFromIDList(mydocs_pidl)
-            log_file_path = os.path.join(mydocs_path, "dragonfly.txt")
-            _file_handler = logging.FileHandler(log_file_path)
-            formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
-                                          " %(message)s")
-            _file_handler.setFormatter(formatter)
+        else:
+            # Use current working directory.
+            mydocs_path = ""
+        log_file_path = os.path.join(mydocs_path, b"dragonfly.txt")
+        _file_handler = logging.FileHandler(log_file_path)
+        formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
+                                      " %(message)s")
+        _file_handler.setFormatter(formatter)
     return _file_handler
 
 

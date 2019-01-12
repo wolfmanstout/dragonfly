@@ -73,7 +73,13 @@ setup(
                      "sphinxwrapper >= 1.1.1",
                      "pyjsgf >= 1.2.2",
                      "pyaudio"
-                    ]
+                    ],
+          "google": [
+                     "win10toast;platform_system=='Windows'",
+                     "pyaudio",
+                     "google-cloud-speech",
+                     "inflect"
+                    ],
       },
 
       classifiers=[

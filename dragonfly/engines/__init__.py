@@ -114,6 +114,24 @@ def get_engine(name=None):
             if name:
                 raise EngineError(message)
 
+    if not name or name == "google":
+        # Attempt to retrieve the Google Cloud API back-end.
+        try:
+            from .backend_google import is_engine_available
+            from .backend_google import get_engine as get_specific_engine
+            if is_engine_available():
+                _default_engine = get_specific_engine()
+                _engines_by_name["google"] = _default_engine
+                return _default_engine
+        except Exception as e:
+            message = ("Exception while initializing google engine:"
+                       " %s" % (e,))
+            log.exception(message)
+            traceback.print_exc()
+            print(message)
+            if name:
+                raise EngineError(message)
+
     # Only retrieve the text input engine if explicitly specified; it is not
     # an actual SR engine implementation and is mostly intended to be used
     # for testing.
