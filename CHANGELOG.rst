@@ -12,6 +12,46 @@ Note: this project had no release versions between 0.6.6b1_ and
 commit history and will be placed under headings in this file over time.
 
 
+Unreleased_
+-----------
+
+Added
+~~~~~
+* Add more doctests for fundamental dragonfly elements.
+* Add simple timer manager class for the text input engine.
+* Add tests for exclusive grammars and grammar/rule contexts.
+
+Changed
+~~~~~~~
+* Change logging framework to use ~/.dragonfly.log as the log file to make
+  logging work on Windows and on other operating systems.
+* Change the Natlink test suite to run different tests for different DNS
+  versions.
+* Change the default test suite to the "text" engine's test suite and add it
+  to the CI build.
+* Update documentation page for the test suites.
+
+Fixed
+~~~~~
+* Fix bug where the :class:`Text` action intermittently ignores the
+  hardware_apps override.
+* Fix some encoding bugs with the text input engine.
+* Fix various issues with dragonfly's tests.
+
+Removed
+~~~~~~~
+* Remove old test files.
+
+0.10.1_ - 2019-01-06
+--------------------
+
+Fixed
+~~~~~
+* Disable **backwards-incompatible** Unicode keyboard functionality by
+  default for the :class:`Text` action. Restoring the old behaviour
+  requires deleting/modifying the `~/.dragonfly2-speech/settings.cfg`
+  file.
+
 0.10.0_ - 2018-12-28
 --------------------
 
@@ -29,6 +69,8 @@ Changed
 ~~~~~~~
 * Change default paste key for the Paste action to Shift+insert.
 * Change typeables.py to log errors for untypeable characters.
+* Make **backwards-incompatible** change to the :class:`Text` class where
+  it no longer respects modifier keys being held down by default.
 * Move TestContext class from Pocket Sphinx engine tests into
   test/infrastructure.py.
 * Move command module classes from loader scripts into
@@ -215,19 +257,20 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/Danesprite/dragonfly/compare/0.10.0...HEAD
-.. _0.10.0:      https://github.com/Danesprite/dragonfly/compare/0.9.1...0.10.0
-.. _0.9.1:       https://github.com/Danesprite/dragonfly/compare/0.9.0...0.9.1
-.. _0.9.0:       https://github.com/Danesprite/dragonfly/compare/0.8.0...0.9.0
-.. _0.8.0:       https://github.com/Danesprite/dragonfly/compare/0.7.0...0.8.0
-.. _0.7.0:       https://github.com/Danesprite/dragonfly/compare/74981c1...0.7.0
-.. _0.6.6b1:     https://github.com/Danesprite/dragonfly/compare/0.6.5...0.6.6b1
-.. _0.6.5:       https://github.com/Danesprite/dragonfly/compare/0.6.4-rc3...0.6.5
-.. _0.6.4:       https://github.com/Danesprite/dragonfly/compare/0.6.4-rc3...0.6.4
-.. _0.6.4-rc3:   https://github.com/Danesprite/dragonfly/compare/0.6.4-rc2...0.6.4-rc3
-.. _0.6.4-rc2:   https://github.com/Danesprite/dragonfly/compare/0.6.4-rc1...0.6.4-rc2
-.. _0.6.4-rc1:   https://github.com/Danesprite/dragonfly/compare/0.6.1...0.6.4-rc1
-.. _0.6.1:       https://github.com/Danesprite/dragonfly/compare/03d06af...0.6.1
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.10.1...HEAD
+.. _0.10.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.10.0...0.10.1
+.. _0.10.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.9.1...0.10.0
+.. _0.9.1:       https://github.com/dictation-toolbox/dragonfly/compare/0.9.0...0.9.1
+.. _0.9.0:       https://github.com/dictation-toolbox/dragonfly/compare/0.8.0...0.9.0
+.. _0.8.0:       https://github.com/dictation-toolbox/dragonfly/compare/0.7.0...0.8.0
+.. _0.7.0:       https://github.com/dictation-toolbox/dragonfly/compare/74981c1...0.7.0
+.. _0.6.6b1:     https://github.com/dictation-toolbox/dragonfly/compare/0.6.5...0.6.6b1
+.. _0.6.5:       https://github.com/dictation-toolbox/dragonfly/compare/0.6.4-rc3...0.6.5
+.. _0.6.4:       https://github.com/dictation-toolbox/dragonfly/compare/0.6.4-rc3...0.6.4
+.. _0.6.4-rc3:   https://github.com/dictation-toolbox/dragonfly/compare/0.6.4-rc2...0.6.4-rc3
+.. _0.6.4-rc2:   https://github.com/dictation-toolbox/dragonfly/compare/0.6.4-rc1...0.6.4-rc2
+.. _0.6.4-rc1:   https://github.com/dictation-toolbox/dragonfly/compare/0.6.1...0.6.4-rc1
+.. _0.6.1:       https://github.com/dictation-toolbox/dragonfly/compare/03d06af...0.6.1
 
 .. Other links.
 .. _Keep a Changelog: https://keepachangelog.com/en/1.0.0/
