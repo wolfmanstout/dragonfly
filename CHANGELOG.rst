@@ -11,6 +11,37 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
+
+Unreleased_
+-----------
+
+Added
+~~~~~
+* Add more doctests for fundamental dragonfly elements.
+* Add simple timer manager class for the text input engine.
+* Add tests for exclusive grammars and grammar/rule contexts.
+
+Changed
+~~~~~~~
+* Change logging framework to use ~/.dragonfly.log as the log file to make
+  logging work on Windows and on other operating systems.
+* Change the Natlink test suite to run different tests for different DNS
+  versions.
+* Change the default test suite to the "text" engine's test suite and add it
+  to the CI build.
+* Update documentation page for the test suites.
+
+Fixed
+~~~~~
+* Fix bug where the :class:`Text` action intermittently ignores the
+  hardware_apps override.
+* Fix some encoding bugs with the text input engine.
+* Fix various issues with dragonfly's tests.
+
+Removed
+~~~~~~~
+* Remove old test files.
+
 0.10.1_ - 2019-01-06
 --------------------
 
@@ -20,7 +51,6 @@ Fixed
   default for the :class:`Text` action. Restoring the old behaviour
   requires deleting/modifying the `~/.dragonfly2-speech/settings.cfg`
   file.
-
 
 0.10.0_ - 2018-12-28
 --------------------
