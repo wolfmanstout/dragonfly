@@ -27,22 +27,31 @@ SAPI 5 engine classes
 
 #---------------------------------------------------------------------------
 
+import logging
 import time
+import os.path
+
+from datetime import datetime
+from ctypes import Structure, c_long, c_int, c_uint, pointer
 from six import string_types, integer_types
 
-import win32con
-from ctypes import *
+try:
+    import win32con
+    from win32com.client           import Dispatch, getevents, constants
+    from win32com.client.gencache  import EnsureDispatch
+    from ctypes import windll, WinError
+except ImportError:
+    # Ignore import errors so that documentation can be built on other
+    # platforms.
+    pass
 
-from win32com.client           import Dispatch, getevents, constants
-from win32com.client.gencache  import EnsureDispatch
-from pywintypes                import com_error
-
-from ..base                    import EngineBase, EngineError
+from ..base                    import (EngineBase, EngineError,
+                                       MimicFailure, ThreadedTimerManager)
 from .compiler                 import Sapi5Compiler
 from .dictation                import Sapi5DictationContainer
 from .recobs                   import Sapi5RecObsManager
-#from .timer                    import NatlinkTimerManager
 from ...grammar.state          import State
+from ...grammar.recobs         import RecognitionObserver
 from ...windows.window         import Window
 
 
@@ -61,32 +70,53 @@ class MSG(Structure):
                 ('pt', POINT)]
 
 
+class MimicObserver(RecognitionObserver):
+    _log = logging.getLogger("SAPI5 RecObs")
+
+    def __init__(self):
+        self.status = "none"
+
+    def on_recognition(self, words):
+        self._log.debug("SAPI5 RecObs on_recognition(): %r" % (words,))
+        self.status = "recognition: %r" % (words,)
+
+    def on_failure(self):
+        self._log.debug("SAPI5 RecObs on_failure()")
+        self.status = "failure"
+
+
 #===========================================================================
 
 class Sapi5SharedEngine(EngineBase):
     """ Speech recognition engine back-end for SAPI 5 shared recognizer. """
 
     _name = "sapi5shared"
-    _recognizer_dispatch_name = "SAPI.SpSharedRecognizer"
+    recognizer_dispatch_name = "SAPI.SpSharedRecognizer"
     DictationContainer = Sapi5DictationContainer
 
     #-----------------------------------------------------------------------
 
-    def __init__(self):
+    def __init__(self, retain_dir=None):
         EngineBase.__init__(self)
 
-        EnsureDispatch(self._recognizer_dispatch_name)
+        EnsureDispatch(self.recognizer_dispatch_name)
         EnsureDispatch("SAPI.SpVoice")
         self._recognizer  = None
         self._speaker     = None
         self._compiler    = None
 
         self._recognition_observer_manager = Sapi5RecObsManager(self)
-#        self._timer_manager = NatlinkTimerManager(0.02, self)
+        self._timer_manager = ThreadedTimerManager(0.02, self)
+
+        if isinstance(retain_dir, string_types) or retain_dir is None:
+            self._retain_dir = retain_dir
+        else:
+            self._retain_dir = None
+            self._log.error("Invalid retain_dir: %r" % retain_dir)
 
     def connect(self):
         """ Connect to back-end SR engine. """
-        self._recognizer  = Dispatch(self._recognizer_dispatch_name)
+        self._recognizer  = Dispatch(self.recognizer_dispatch_name)
         self._speaker     = Dispatch("SAPI.SpVoice")
         self._compiler    = Sapi5Compiler()
 
@@ -116,15 +146,18 @@ class Sapi5SharedEngine(EngineBase):
         # Create recognition context, compile grammar, and create
         #  the grammar wrapper object for managing this grammar.
         context = self._recognizer.CreateRecoContext()
+        if self._retain_dir:
+            context.RetainedAudio = constants.SRAORetainAudio
         handle = self._compiler.compile_grammar(grammar, context)
-        wrapper = GrammarWrapper(grammar, handle, context, self)
+        wrapper = GrammarWrapper(grammar, handle, context, self,
+                                 self._recognition_observer_manager)
 
         handle.State = constants.SGSEnabled
         for rule in grammar.rules:
             handle.CmdSetRuleState(rule.name, constants.SGDSActive)
-#        self.activate_grammar(grammar)
-#        for l in grammar.lists:
-#            l._update()
+       # self.activate_grammar(grammar)
+       # for l in grammar.lists:
+       #     l._update()
         handle.CmdSetRuleState("_FakeRule", constants.SGDSActive)
 
         return wrapper
@@ -181,7 +214,7 @@ class Sapi5SharedEngine(EngineBase):
                         % (grammar.name, exclusive))
         grammar_handle = self._get_grammar_wrapper(grammar).handle
         grammar_handle.State = constants.SGSExclusive
-#        grammar_handle.SetGrammarState(constants.SPGS_EXCLUSIVE)
+       # grammar_handle.SetGrammarState(constants.SPGS_EXCLUSIVE)
 
 
     #-----------------------------------------------------------------------
@@ -189,11 +222,62 @@ class Sapi5SharedEngine(EngineBase):
 
     def mimic(self, words):
         """ Mimic a recognition of the given *words*. """
+        self._log.debug("SAPI5 mimic: %r" % (words,))
         if isinstance(words, string_types):
             phrase = words
         else:
             phrase = " ".join(words)
+
+        # Register a recognition observer for checking the success of this
+        # mimic.
+        observer = MimicObserver()
+        observer.register()
+
+        # Emulate recognition of the phrase and wait for recognition to
+        # finish, timing out after 2 seconds.
         self._recognizer.EmulateRecognition(phrase)
+        timeout = 2
+        NULL = c_int(win32con.NULL)
+        if timeout != None:
+            begin_time = time.time()
+            windll.user32.SetTimer(NULL, NULL, int(timeout * 1000), NULL)
+    
+        message = MSG()
+        message_pointer = pointer(message)
+        while (not timeout) or (time.time() - begin_time < timeout):
+            if timeout:
+                self._log.debug("SAPI5 message loop: %s sec left"
+                                % (timeout + begin_time - time.time()))
+            else:
+                self._log.debug("SAPI5 message loop: no timeout")
+
+            if windll.user32.GetMessageW(message_pointer, NULL, 0, 0) == 0:
+                msg = str(WinError())
+                self._log.error("GetMessageW() failed: %s" % msg)
+                raise EngineError("GetMessageW() failed: %s" % msg)
+
+            self._log.debug("SAPI5 message: %r" % (message.message,))
+            if message.message == win32con.WM_TIMER:
+                # A timer message means this loop has timed out.
+                self._log.debug("SAPI5 message loop timed out: %s sec left"
+                                % (timeout + begin_time - time.time()))
+                break
+            else:
+                # Process other messages as normal.
+                self._log.debug("SAPI5 message translating and dispatching.")
+                windll.user32.TranslateMessage(message_pointer)
+                windll.user32.DispatchMessageW(message_pointer)
+
+            if observer.status.startswith("recognition:"):
+                # The previous message was a recognition which matched.
+                self._log.debug("SAPI5 message caused recognition.")
+
+        # Unregister the observer and check its status.
+        observer.unregister()
+        if observer.status == "failure":
+            raise MimicFailure("Mimic failed.")
+        elif observer.status == "none":
+            raise MimicFailure("Mimic failed, nothing happened.")
 
     def speak(self, text):
         """ Speak the given *text* using text-to-speech. """
@@ -201,36 +285,6 @@ class Sapi5SharedEngine(EngineBase):
 
     def _get_language(self):
         return "en"
-
-    def wait_for_recognition(self, timeout=None):
-        NULL = c_int(win32con.NULL)
-        if timeout != None:
-            begin_time = time.time()
-            timed_out = False
-            windll.user32.SetTimer(NULL, NULL, int(timeout * 1000), NULL)
-    
-        message = MSG()
-        message_pointer = pointer(message)
-
-        while (not timeout) or (time.time() - begin_time < timeout):
-            self._log.error("loop")
-            if windll.user32.GetMessageW(message_pointer, NULL, 0, 0) == 0:
-                msg = str(WinError())
-                self._log.error("GetMessageW() failed: %s" % msg)
-                raise EngineError("GetMessageW() failed: %s" % msg)
-
-            if message.message == win32con.WM_TIMER:
-                self._log.error("loop, timeout")
-                # A timer message means this loop has timed out.
-                timed_out = True
-                break
-            else:
-                self._log.error("loop, dispatch")
-                # Process other messages as normal.
-                windll.user32.TranslateMessage(message_pointer)
-                windll.user32.DispatchMessageW(message_pointer)
-
-        return not timed_out
 
 
 #---------------------------------------------------------------------------
@@ -250,7 +304,7 @@ class Sapi5InProcEngine(Sapi5SharedEngine):
     """
 
     _name = "sapi5inproc"
-    _recognizer_dispatch_name = "SAPI.SpInProcRecognizer"
+    recognizer_dispatch_name = "SAPI.SpInProcRecognizer"
 
     def connect(self, audio_source=0):
         """
@@ -342,11 +396,12 @@ def collection_iter(collection):
 
 class GrammarWrapper(object):
 
-    def __init__(self, grammar, handle, context, engine):
+    def __init__(self, grammar, handle, context, engine, recobs_manager):
         self.grammar = grammar
         self.handle = handle
         self.engine = engine
         self.context = context
+        self.recobs_manager = recobs_manager
 
         # Register callback functions which will handle recognizer events.
         base = getevents("SAPI.SpSharedRecoContext")
@@ -406,10 +461,17 @@ class GrammarWrapper(object):
 
             results = []
             rule_set = list(set(rule_names))
+
             elements = phrase_info.Elements
             for index in range(len(rule_names)):
                 element = elements.Item(index)
                 rule_id = rule_set.index(rule_names[index])
+
+                # Map dictation rule IDs to 1M so that dragonfly recognizes
+                # the words as dictation.
+                if rule_names[index] == "dgndictation":
+                    rule_id = 1000000
+
                 replacement = replacements[index]
                 info = [element.LexicalForm, rule_id,
                         element.DisplayText, element.DisplayAttributes,
@@ -417,21 +479,71 @@ class GrammarWrapper(object):
                 results.append(info)
 
             #---------------------------------------------------------------
+            # Retain audio
+
+            # Only write audio data and metadata if the directory exists.
+            retain_dir = self.engine._retain_dir
+            if retain_dir and not os.path.isdir(retain_dir):
+                self.engine._log.warning(
+                    "Audio was not retained because '%s' was not a "
+                    "directory" % retain_dir
+                )
+            elif retain_dir:
+                try:
+                    file_stream = Dispatch("SAPI.SpFileStream")
+                    # Note: application can also retrieve smaller portions
+                    # of the audio stream by specifying a starting phrase
+                    # element and phrase element length.
+                    audio_stream = newResult.Audio()
+
+                    # Make sure we have audio data, which we wouldn't from a
+                    # mimic or if the retain flag wasn't set above.
+                    if audio_stream:
+                        # Write audio data.
+                        file_stream.Format = audio_stream.Format
+                        now = datetime.now()
+                        filename = ("retain_%s.wav"
+                                    % now.strftime("%Y-%m-%d_%H-%M-%S_%f"))
+                        wav_path = os.path.join(retain_dir, filename)
+                        flags = constants.SSFMCreateForWrite
+                        file_stream.Open(wav_path, flags)
+                        try:
+                            file_stream.Write(audio_stream.GetData())
+                        finally:
+                            file_stream.Close()
+
+                        # Write metadata
+                        words = ' '.join([r[2] for r in results])
+                        audio_length = int(newResult.Times.Length) / 1e7
+                        tsv_path = os.path.join(retain_dir, "retain.tsv")
+                        with open(tsv_path, "a") as tsv_file:
+                            tsv_file.write('\t'.join([
+                                filename, str(audio_length),
+                                self.grammar.name, rule_name, words
+                            ]) + '\n')
+                except:
+                    self.engine._log.exception("Exception retaining audio")
+
+            #---------------------------------------------------------------
             # Attempt to parse the recognition.
 
             func = getattr(self.grammar, "process_recognition", None)
+            words = tuple([r[0] for r in results])
             if func:
-                words = [r[2] for r in results]
                 if not func(words):
                     return
 
             s = State(results, rule_set, self.engine)
-            for r in self.grammar._rules:
-                if r.name != rule_name:
+            for r in self.grammar.rules:
+                if not r.active:
                     continue
+
                 s.initialize_decoding()
                 for result in r.decode(s):
                     if s.finished():
+                        # Notify recognition observers, then process the
+                        # rule.
+                        self.recobs_manager.notify_recognition(words)
                         root = s.build_parse_tree()
                         r.process_recognition(root)
                         return
@@ -450,16 +562,16 @@ class GrammarWrapper(object):
                                   [r[0] for r in results]))
 
     def recognition_other_callback(self, StreamNumber, StreamPosition):
-            func = getattr(self.grammar, "process_recognition_other", None)
-            if func:
-                # Note that SAPI 5.3 doesn't offer access to the actual
-                #  recognition contents during a
-                #  OnRecognitionForOtherContext event.
-                func(words=False)
-            return
+        func = getattr(self.grammar, "process_recognition_other", None)
+        if func:
+            # Note that SAPI 5.3 doesn't offer access to the actual
+            #  recognition contents during a
+            #  OnRecognitionForOtherContext event.
+            func(words=False)
+        return
 
     def recognition_failure_callback(self, StreamNumber, StreamPosition, Result):
-            func = getattr(self.grammar, "process_recognition_failure", None)
-            if func:
-                func()
-            return
+        func = getattr(self.grammar, "process_recognition_failure", None)
+        if func:
+            func()
+        return

@@ -59,6 +59,7 @@ default_levels = {
                   "context.match":        (_warning, _info),
                   "rule":                 (_warning, _info),
                   "config":               (_warning, _info),
+                  "module":               (_info, _info),
                   "monitor.init":         (_warning, _info),
                   "dfly.test":            (_debug, _debug),
                   "accessibility":        (_info, _info),
@@ -139,6 +140,13 @@ def _setup_file_handler():
         formatter = logging.Formatter("%(asctime)s %(name)s (%(levelname)s):"
                                       " %(message)s")
         _file_handler.setFormatter(formatter)
+
+        # Clear the log file if the handler hasn't been set up yet.
+        # This prevents the file growing to ridiculous sizes, assuming
+        # the interpreter is restarted occasionally.
+        with open(log_file_path, "w") as f:
+            f.write("\n")
+
     return _file_handler
 
 
