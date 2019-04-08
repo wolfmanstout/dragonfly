@@ -11,32 +11,114 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
-
 Unreleased_
 -----------
 
+Fixed
+~~~~~
+* Fix Sphinx engine bug where grammar searches could be overridden.
+
+0.12.0_
+-------
+
 Added
 ~~~~~
-* Add more doctests for fundamental dragonfly elements.
-* Add simple timer manager class for the text input engine.
-* Add tests for exclusive grammars and grammar/rule contexts.
+* Add *CONTRIBUTING.rst* file.
+* Add Repetition 'optimize' parameter that should reduce grammar complexity.
+* Add SphinxEngine.default_search_result property.
+* Add SphinxEngine.write_transcript_files method.
+* Add WSR/SAPI5 retain audio support for saving recognition data
+  (thanks `@daanzu`_).
+* Add example *sphinx_wave_transcriber.py* script into *dragonfly/examples*.
+* Allow passing keyword arguments to get_engine() functions
+  (thanks `@daanzu`_).
 
 Changed
 ~~~~~~~
-* Change logging framework to use ~/.dragonfly.log as the log file to make
-  logging work on Windows and on other operating systems.
-* Change the Natlink test suite to run different tests for different DNS
-  versions.
-* Change the default test suite to the "text" engine's test suite and add it
-  to the CI build.
-* Update documentation page for the test suites.
+* Change Sphinx and text engines to call notify_recognition() before rule processing.
+* Change Sphinx engine to allow specifying default decoder search options
+  other than "-lm".
+* Change SphinxEngine.process_wave_file() method to yield recognised words.
+* Change the format of the Sphinx engine's saved training data.
+* Disable the Sphinx engine's built-in key phrases if the engine language
+  isn't English.
+* Disable writing Sphinx engine training data to files by default.
+* Erase dragonfly's log file when creating the logging handler to avoid
+  large files.
+* Make all Sphinx engine configuration optional.
+* Replace Sphinx engine's *PYAUDIO_STREAM_KEYWORD_ARGS* config option with 4
+  new options.
+* Simplify Sphinx engine backend code and improve its performance.
+* Update Sphinx engine documentation to reflect the other changes.
 
 Fixed
 ~~~~~
-* Fix bug where the :class:`Text` action intermittently ignores the
-  hardware_apps override.
+* Add rule processing error handling to the Sphinx and text engines.
+* Fix lots of bugs with the Sphinx engine backend.
+* Fix Sphinx engine's support for exclusive grammars and multiplexing
+  timers.
+* Minimise dropped audio frames when recording with the Sphinx engine.
+
+Removed
+~~~~~~~
+* Remove Sphinx engine's *config.py* file.
+* Remove the Sphinx engine's support for Dictation elements for now.
+* Remove/hide some unnecessary public SphinxEngine methods and properties.
+
+0.11.1_ - 2019-02-22
+--------------------
+
+Changed
+~~~~~~~
+* Change the RunCommand action to allow the *command* argument to be a list
+  to pass directly to *subprocess.Popen* instead of through *shlex.split()*.
+
+Fixed
+~~~~~
+* Fix the RunCommand action so it properly parses command strings using
+  non-POSIX/Windows paths.
+* Fix minor issues with RunCommand's string representation and error logging.
+
+0.11.0_ - 2019-01-30
+--------------------
+
+Added
+~~~~~
+* Add additional tests to dragonfly's test suites.
+* Add documentation for dragonfly's timer classes.
+* Add new synchronous and process properties and error handling to
+  the RunCommand action.
+* Add timer manager class for the text input and SAPI 5 engines.
+
+Changed
+~~~~~~~
+* Change default engine class for SAPI 5 engine backend to
+  Sapi5InProcEngine.
+* Change logging framework to use *~/.dragonfly.log* as the log
+  file to make logging work on Windows and on other operating
+  systems.
+* Change the Natlink test suite to run different tests for
+  different DNS versions.
+* Change the default test suite to the "text" engine's test suite
+  and add it to the CI build.
+* Change typeables.py so that all symbols can be referred to by
+  their printable representation (thanks `@wolfmanstout`_).
+* Make several changes to the SAPI 5 engine backend so it passes
+  the relevant dragonfly tests.
+* Update how _generate_typeables.py generates code used in
+  typeables.py.
+* Update several documentation pages.
+* Use a RecognitionObserver in dfly-loader-wsr.py for user feedback
+  when using Sapi5InProcEngine.
+
+Fixed
+~~~~~
+* Add default implementation for the RunCommand.process_command
+  method so that most commands don't hang without an implementation.
+* Fix bug where the Text action intermittently ignores the
+  hardware_apps override (thanks `@wolfmanstout`_).
 * Fix some encoding bugs with the text input engine.
-* Fix various issues with dragonfly's tests.
+* Fix various issues with dragonfly's tests and test framework.
 
 Removed
 ~~~~~~~
@@ -48,7 +130,7 @@ Removed
 Fixed
 ~~~~~
 * Disable **backwards-incompatible** Unicode keyboard functionality by
-  default for the :class:`Text` action. Restoring the old behaviour
+  default for the Text action. Restoring the old behaviour
   requires deleting/modifying the `~/.dragonfly2-speech/settings.cfg`
   file.
 
@@ -57,7 +139,7 @@ Fixed
 
 Added
 ~~~~~
-* Add configurable Windows Unicode keyboard support to the :class:`Text`
+* Add configurable Windows Unicode keyboard support to the Text
   action (thanks `@Versatilus`_).
 * Add Windows accessibility API support to Dragonfly (thanks
   `@wolfmanstout`_).
@@ -69,7 +151,7 @@ Changed
 ~~~~~~~
 * Change default paste key for the Paste action to Shift+insert.
 * Change typeables.py to log errors for untypeable characters.
-* Make **backwards-incompatible** change to the :class:`Text` class where
+* Make **backwards-incompatible** change to the Text class where
   it no longer respects modifier keys being held down by default.
 * Move TestContext class from Pocket Sphinx engine tests into
   test/infrastructure.py.
@@ -126,7 +208,7 @@ Fixed
 * Make Read the Docs generate documentation from Python modules again.
 
 0.8.0_ - 2018-09-27
----------------------
+-------------------
 
 Added
 ~~~~~
@@ -257,7 +339,10 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.10.1...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.12.0...HEAD
+.. _0.12.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.11.1...0.12.0
+.. _0.11.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.11.0...0.11.1
+.. _0.11.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.10.1...0.11.0
 .. _0.10.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.10.0...0.10.1
 .. _0.10.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.9.1...0.10.0
 .. _0.9.1:       https://github.com/dictation-toolbox/dragonfly/compare/0.9.0...0.9.1
