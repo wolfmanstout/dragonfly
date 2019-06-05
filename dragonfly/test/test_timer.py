@@ -62,14 +62,33 @@ class TestTimer(unittest.TestCase):
         time.sleep(0.02)
         timer.manager.main_callback()
 
-        # Callback was called one or more times. The engine may or may not
-        # have called it already by the time we get here, but getting an
-        # exact call count is not required.
+        # Callback was called once.
         try:
-            self.assertTrue(callback_called[0] >= 1)
-            self.assertTrue(len(self.log_capture.records) >= 1)
+            self.assertTrue(callback_called[0] == 1)
+            self.assertTrue(len(self.log_capture.records) == 1)
             log_message = self.log_capture.records[0].msg
             self.assertTrue("Exception from timer callback" in log_message)
+        finally:
+            # Stop the timer at the end regardless of the result.
+            timer.stop()
+
+    def test_non_repeating_timers(self):
+        """ Test that non-repeating timers only run once. """
+
+        callback_called = [0]
+        def callback():
+            callback_called[0] += 1
+
+        interval = 0.01
+        timer = self.engine.create_timer(callback, interval, False)
+        time.sleep(0.02)
+        timer.manager.main_callback()
+        time.sleep(0.02)
+        timer.manager.main_callback()
+
+        # Callback was only called once.
+        try:
+            self.assertEqual(callback_called[0], 1)
         finally:
             # Stop the timer at the end regardless of the result.
             timer.stop()
@@ -77,4 +96,10 @@ class TestTimer(unittest.TestCase):
 #===========================================================================
 
 if __name__ == "__main__":
+    # Use the "text" engine by default and disable timer manager callbacks
+    # to avoid race conditions.
+    get_engine("text")._timer_manager.disable()
+
+    from dragonfly.log import setup_log
+    setup_log()  # tests require sane logging levels
     unittest.main()

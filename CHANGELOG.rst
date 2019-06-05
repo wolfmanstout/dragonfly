@@ -14,12 +14,100 @@ commit history and will be placed under headings in this file over time.
 Unreleased_
 -----------
 
+Added
+~~~~~
+
+* Add FuncContext class that determines context activity by callable arg
+  (thanks `@daanzu`_).
+
+Changed
+~~~~~~~
+
+* Change the dragonfly.timer._Timer class so that it works correctly for all
+  supported engines and platforms via engine.create_timer().
+
+Deprecated
+~~~~~~~~~~
+
+* Deprecate the old dragonfly.timer._Timer class.
+
+0.14.1_ - 2019-05-31
+--------------------
+
+Changed
+~~~~~~~
+* Change English integers to include "too" and "to" as equivalents for
+  "two" (thanks `@lexxish`_).
+
+0.14.0_ - 2019-05-21
+--------------------
+
+Added
+~~~~~
+* Add documentation on dragonfly's logging infrastructure.
+* Add dragonfly.rpc sub-package and usage example.
+* Add enable() and disable() methods to ThreadedTimerManager class.
+* Add optional "repeating" parameter to the multiplexing Timer class and
+  engine.create_timer() method.
+* Add recognize_forever() method to WSR engine class.
+
+Changed
+~~~~~~~
+* Change AppContext class to allow lists of titles and executables
+  (thanks `@mrob95`_).
+* Change WSR engine to call timer functions on the main thread.
+* Change dragonfly stdout logging formatter to include the level name.
+* Make dragonfly's multiplexing timer classes more thread safe.
+* Replace WSR module loader's PumpWaitingMessages loop with
+  engine.recognize_forever().
+* Simplify sphinx engine availability checks.
+
 Fixed
 ~~~~~
-* Fix Sphinx engine bug where grammar searches could be overridden.
+* Fix WSR engine context bug with a hook for foreground window changes
+  (thanks `@tylercal`_).
+* Fix a bug with Monitor objects caused by incorrect coordinate calculations
+  (thanks `@tylercal`_).
+* Fix some example files that break if used with Python 3.
+* Stop calling setup_log() in a few dragonfly modules to avoid side effects.
+* Stop encoding to windows-1252 in a few places if using Python 3
+  (thanks `@tylercal`_).
+* Stop erasing dragonfly's logging file now that setup_log() isn't always
+  used.
 
-0.12.0_
--------
+0.13.0_ - 2019-04-24
+--------------------
+
+Added
+~~~~~
+* Add and document optional "remap_data" parameter to Function action to
+  allow using extras with different names than the function argument names.
+* Add Key, Text and Paste action support for X11 and Mac OS using `pynput`_.
+* Add modified ContextAction class from `Aenea`_
+  (thanks `@calmofthestorm`_).
+* Add more flexible ShortIntegerRef class (thanks `@mrob95`_).
+
+Changed
+~~~~~~~
+* Allow saying "oh" as well as "zero" for IntegerRefs.
+* Change the Sphinx engine to disallow multiple grammars with the same name.
+* Change the Text action's default pause value to 0.005 seconds & make it
+  configurable.
+* Rename *Language Support* doc page to *Language Support & Sub-package*.
+* Rename 3 example command modules to start with underscores.
+* Stop mocking Windows-only sendinput classes & functions on other
+  platforms.
+* Update some documentation to mention that dragonfly's module loaders will
+  load from files matching "_\*.py" rather than "\*.py".
+
+Fixed
+~~~~~
+* Allow Text sub-classes to override the '_pause_default' attribute.
+* Fix Sphinx engine bug where grammar searches could be overridden.
+* Fix some issues with dragonfly's mocked actions.
+
+0.12.0_ - 2019-04-04
+--------------------
 
 Added
 ~~~~~
@@ -339,7 +427,10 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.12.0...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.14.1...HEAD
+.. _0.14.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.14.0...0.14.1
+.. _0.14.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.13.0...0.14.0
+.. _0.13.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.12.0...0.13.0
 .. _0.12.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.11.1...0.12.0
 .. _0.11.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.11.0...0.11.1
 .. _0.11.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.10.1...0.11.0
@@ -365,3 +456,9 @@ This release is the first in the Git version control system.
 .. _@daanzu: https://github.com/daanzu
 .. _@Versatilus: https://github.com/Versatilus
 .. _@wolfmanstout: https://github.com/wolfmanstout
+.. _@calmofthestorm: https://github.com/calmofthestorm
+.. _@mrob95: https://github.com/mrob95
+.. _@tylercal: https://github.com/tylercal
+.. _@lexxish: https://github.com/lexxish
+.. _Aenea: https://github.com/dictation-toolbox/aenea
+.. _pynput: https://github.com/moses-palmer/pynput
