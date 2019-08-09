@@ -19,22 +19,20 @@
 #
 
 """
-Dictation container for the Kaldi engine.
+Dictation container for the SAPI5 engine.
 
 """
-
-import logging, locale
+import locale
 
 from six import PY2
 
 from ..base import DictationContainerBase
-from ...grammar.elements_basic import Dictation as BaseDictation
 
 
 #---------------------------------------------------------------------------
-# Kaldi dictation class -- container for a series of dictated words.
+# SAPI5 dictation class -- container for a series of dictated words.
 
-class KaldiDictationContainer(DictationContainerBase):
+class Sapi5DictationContainer(DictationContainerBase):
 
     def __init__(self, words):
         DictationContainerBase.__init__(self, words=words)
@@ -48,23 +46,3 @@ class KaldiDictationContainer(DictationContainerBase):
             return self.__unicode__().encode(locale.getpreferredencoding())
         else:
             return self.__unicode__()
-
-
-#---------------------------------------------------------------------------
-# Cloud dictation classes -- elements capable of local or cloud dictation.
-
-class CloudDictation(BaseDictation):
-
-    cloud_default = True
-
-    def __init__(self, *args, **kwargs):
-        self.cloud = kwargs.pop('cloud', self.cloud_default)
-        BaseDictation.__init__(self, *args, **kwargs)
-
-class LocalDictation(BaseDictation):
-
-    cloud_default = False
-
-    def __init__(self, *args, **kwargs):
-        self.cloud = kwargs.pop('cloud', self.cloud_default)
-        BaseDictation.__init__(self, *args, **kwargs)

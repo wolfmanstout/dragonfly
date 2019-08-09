@@ -27,7 +27,8 @@ import collections, os, subprocess, threading, time
 from six import string_types, integer_types, print_
 
 from ..base                     import (EngineBase, EngineError, MimicFailure,
-                                        DelegateTimerManager, DelegateTimerManagerInterface, DictationContainerBase)
+                                        DelegateTimerManager, DelegateTimerManagerInterface)
+from .dictation                 import KaldiDictationContainer
 from .recobs                    import KaldiRecObsManager
 from .testing                   import debug_timer
 from ...grammar.state           import State
@@ -52,7 +53,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
     """ Speech recognition engine back-end for Kaldi recognizer. """
 
     _name = "kaldi"
-    DictationContainer = DictationContainerBase
+    DictationContainer = KaldiDictationContainer
 
     #-----------------------------------------------------------------------
 

@@ -25,9 +25,10 @@ from six import string_types, text_type, PY2
 import dragonfly.grammar.state as state_
 from dragonfly import Window
 
+from .dictation import TextDictationContainer
 from .recobs import TextRecobsManager
 from ..base import (EngineBase, EngineError, MimicFailure,
-                    ThreadedTimerManager, DictationContainerBase)
+                    ThreadedTimerManager)
 
 
 def _map_word(word):
@@ -44,7 +45,7 @@ class TextInputEngine(EngineBase):
     """Text-input Engine class. """
 
     _name = "text"
-    DictationContainer = DictationContainerBase
+    DictationContainer = TextDictationContainer
 
     # -----------------------------------------------------------------------
 
