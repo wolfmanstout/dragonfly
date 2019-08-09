@@ -14,7 +14,8 @@ It currently supports the following speech recognition engines:
 
 -  *Dragon NaturallySpeaking* (DNS), a product of *Nuance*
 -  *Windows Speech Recognition* (WSR), included with Microsoft Windows
-   Vista, Windows 7, and freely available for Windows XP
+   Vista, Windows 7+, and freely available for Windows XP
+-  *Kaldi* (under development)
 -  *CMU Pocket Sphinx* (with caveats)
 
 Dragonfly's documentation is available online at `Read the
@@ -47,6 +48,10 @@ upload releases to PyPI.org, but everything can still be imported using
 :code:`pkg_resources.require("dragonfly >= 0.6.5")`, you will need to either
 replace :code:`dragonfly` with :code:`dragonfly2` or remove lines like this
 altogether.
+
+If you are installing this on X11/Linux, you will also need to install the
+`xdotool <https://www.semicomplete.com/projects/xdotool/>`__ program for the
+``Key`` and ``Text`` actions to work.
 
 If you have dragonfly installed under the original *dragonfly*
 distribution name, you'll need to remove the old version using:
@@ -90,8 +95,9 @@ results.
   engines at the back end, while still providing a single front end
   interface to its users. This means that a program that uses Dragonfly
   can be run on any of the supported back end engines without any
-  modification. Currently Dragonfly supports Dragon NaturallySpeaking
-  and Windows Speech Recognition (included with Windows Vista).
+  modification. Currently Dragonfly supports Dragon NaturallySpeaking,
+  Windows Speech Recognition (included with Windows Vista & above),
+  Kaldi (cross-platform), and CMU Pocket Sphinx (cross-platform).
 
 |
 | *Built-in action framework*

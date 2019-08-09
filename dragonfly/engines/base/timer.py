@@ -221,13 +221,13 @@ class ThreadedTimerManager(TimerManagerBase):
         """"""
         # Stop the thread's main loop and wait until it finishes, timing out
         # after 5 seconds.
-        should_join = (self._thread and self._thread.isAlive() and
+        should_join = (self._thread and self._thread.is_alive() and
                        self._thread is not current_thread())
         self._running = False
         if should_join:
             timeout = 5
             self._thread.join(timeout=timeout)
-            if self._thread.isAlive():
+            if self._thread.is_alive():
                 raise RuntimeError("failed to deactivate main callback "
                                    "after %d seconds" % timeout)
 
@@ -236,16 +236,34 @@ class DelegateTimerManagerInterface(object):
     """
     DelegateTimerManager interface.
     """
+
+    def __init__(self):
+        self._timer_callback = None
+        self._timer_interval = None
+        self._timer_next_time = 0
+
     def set_timer_callback(self, callback, sec):
         """
-        Virtual method to set the timer manager's callback.
+        Method to set the timer manager's callback.
 
         :param callback: function to call every N seconds
         :type callback: callable | None
         :param sec: number of seconds between calls to the callback function
         :type sec: float | int
         """
-        raise NotImplementedError()
+        self._timer_callback = callback
+        self._timer_interval = sec
+        self._timer_next_time = time.time()
+
+    def call_timer_callback(self):
+        """"""
+        if not (self._timer_callback and self._timer_interval):
+            return
+
+        now = time.time()
+        if self._timer_next_time < now:
+            self._timer_next_time = now + self._timer_interval
+            self._timer_callback()
 
 
 class DelegateTimerManager(TimerManagerBase):

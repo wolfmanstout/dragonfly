@@ -1,6 +1,6 @@
 ﻿#
 # This file is part of Dragonfly.
-# (c) Copyright 2007, 2008 by Christo Butcher
+# (c) Copyright 2018 by Dane Finlay
 # Licensed under the LGPL.
 #
 #   Dragonfly is free software: you can redistribute it and/or modify it 
@@ -19,30 +19,23 @@
 #
 
 """
-Dictation container for the SAPI5 engine.
-
+Recognition observer class for Kaldi backend
 """
-import locale
 
-from six import PY2
-
-from ..base import DictationContainerBase
+from ..base import RecObsManagerBase
 
 
-#---------------------------------------------------------------------------
-# SAPI5 dictation class -- container for a series of dictated words.
+class KaldiRecObsManager(RecObsManagerBase):
+    """
+    This class's methods are called by the engine directly, rather than through a
+    grammar.
+    """
+    def __init__(self, engine):
+        RecObsManagerBase.__init__(self, engine)
 
-class Sapi5DictationContainer(DictationContainerBase):
+    # The following methods must be implemented by RecObsManagers.
+    def _activate(self):
+        pass
 
-    def __init__(self, words):
-        DictationContainerBase.__init__(self, words=words)
-
-    def format(self):
-        """ Format and return this dictation. """
-        return " ".join(self._words)
-
-    def __str__(self):
-        if PY2:
-            return self.__unicode__().encode(locale.getpreferredencoding())
-        else:
-            return self.__unicode__()
+    def _deactivate(self):
+        pass

@@ -28,25 +28,27 @@ print("Version:", version, "-- Release:", release)
 
 
 #---------------------------------------------------------------------------
-# Mock libraries that are only available on Windows platforms
-# (i.e. not on Read the Docs or *nix platforms)
+# Mock libraries that are only available on some platforms or with optional
+# dependencies installed.
 
-not_on_windows = not sys.platform.startswith("win")
-if not_on_windows:
-    from mock import MagicMock
+from mock import MagicMock
 
-    class Mock(MagicMock):
-        @classmethod
-        def __getattr__(cls, name):
-            return MagicMock()
-    mock_modules = ["ctypes", "ctypes.wintypes", "pythoncom",
-                    "pywintypes", "win32api", "win32clipboard",
-                    "win32com", "win32com.client",
-                    "win32com.client.gencache", "win32com.gen_py", 
-                    "win32com.shell", "win32con", "win32event",
-                    "win32file", "win32gui", "winsound", "winxpgui"]
-    for module_name in mock_modules:
-        sys.modules[module_name] = Mock()
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return MagicMock()
+
+
+mock_modules = {
+    "ctypes", "ctypes.wintypes", "pythoncom", "pywintypes", "win32api",
+    "win32clipboard", "win32com", "win32com.client", "numpy",
+    "win32com.client.gencache", "win32com.gen_py",  "win32com.shell",
+    "win32con", "win32event", "win32file", "win32gui", "winsound",
+    "winxpgui", "psutil",
+}
+
+for module_name in mock_modules:
+    sys.modules[module_name] = Mock()
 
 
 #---------------------------------------------------------------------------
@@ -70,7 +72,7 @@ autoclass_content = "both"
 #---------------------------------------------------------------------------
 # Options for HTML output
 
-html_theme = "default"
+html_theme = "sphinx_rtd_theme"
 html_last_updated_fmt = "%Y-%m-%d"
 html_copy_source = True
 htmlhelp_basename = "Dragonflydoc"

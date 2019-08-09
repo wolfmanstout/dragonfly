@@ -6,12 +6,13 @@ Dragonfly supports multiple speech recognition engines as its backend.
 The *engines* sub-package implements the interface code for each
 supported engine.
 
-There is a separate page on the CMU Pocket Sphinx engine:
+There are separate pages on the Kaldi and CMU Pocket Sphinx engines:
 
 .. toctree::
     :titlesonly:
     :maxdepth: 1
 
+    kaldi_engine
     sphinx_engine
 
 EngineBase class
@@ -42,6 +43,9 @@ Engine backends
    :members: connect, disconnect
 
 .. autoclass:: dragonfly.engines.backend_sapi5.engine.Sapi5InProcEngine
+   :members:
+
+.. automodule:: dragonfly.engines.backend_kaldi
    :members:
 
 .. automodule:: dragonfly.engines.backend_sphinx

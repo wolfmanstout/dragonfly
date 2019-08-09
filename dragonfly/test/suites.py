@@ -38,23 +38,20 @@ setup_log()
 
 common_names = [
     "test_accessibility",
-    "test_contexts",
+    "test_actions",
+    # "test_contexts",  # disabled for now
     "test_engine_nonexistent",
     "test_log",
     "test_parser",
     "test_rpc",
     "test_timer",
+    "test_window",
     "doc:documentation/test_action_base_doctest.txt",
     "doc:documentation/test_grammar_elements_basic_doctest.txt",
     "doc:documentation/test_grammar_elements_compound_doctest.txt",
     "doc:documentation/test_grammar_list_doctest.txt",
     "doc:documentation/test_recobs_doctest.txt",
 ]
-
-# Only include common Windows-only tests on Windows.
-if os.name == "nt":
-    common_names.extend(["test_window", "test_actions"])
-
 
 # Define spoken language test files. All of them work with the natlink and
 # text engines. The English tests should work with sapi5 and sphinx by
@@ -94,7 +91,15 @@ sphinx_names = [
     "test_language_en_number",
 ] + common_names
 
+kaldi_names = [
+    "test_engine_kaldi",
+    # "test_language_en_number",
+] + common_names
+kaldi_names.remove("doc:documentation/test_grammar_list_doctest.txt")
+kaldi_names.remove("doc:documentation/test_recobs_doctest.txt")
+
 text_names = [
+    "test_contexts",
     "test_engine_text",
     "test_engine_text_dictation",
 ] + common_names + language_names
@@ -128,6 +133,7 @@ def build_suite(suite, names):
 sapi5_suite       = build_suite(EngineTestSuite("sapi5"), sapi5_names)
 sapi5inproc_suite = build_suite(EngineTestSuite("sapi5inproc"), sapi5_names)
 sphinx_suite      = build_suite(EngineTestSuite("sphinx"), sphinx_names)
+kaldi_suite       = build_suite(EngineTestSuite("kaldi"), kaldi_names)
 text_suite        = build_suite(EngineTestSuite("text"), text_names)
 
 
