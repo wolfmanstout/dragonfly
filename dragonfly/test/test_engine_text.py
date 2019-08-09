@@ -24,6 +24,7 @@ import unittest
 from dragonfly.engines import EngineBase
 from dragonfly import (Literal, Dictation, Sequence, CompoundRule,
                        get_engine)
+from dragonfly.engines.backend_text.dictation import TextDictationContainer
 from dragonfly.test import ElementTester, RecognitionFailure, RuleTestCase
 
 
