@@ -25,17 +25,17 @@ Engine class for CMU Pocket Sphinx
 import contextlib
 import logging
 import os
-import time
 import wave
 
 from six import text_type, PY2
 
 from dragonfly import Window
-from .dictation import SphinxDictationContainer
 from .recobs import SphinxRecObsManager
 from .timer import SphinxTimerManager
 from .training import write_training_data, write_transcript_files
-from ..base import EngineBase, EngineError, MimicFailure
+from ..base import (EngineBase, EngineError, MimicFailure,
+                    DelegateTimerManagerInterface,
+                    DictationContainerBase)
 
 try:
     from jsgf import RootGrammar, PublicRule, Literal
@@ -45,34 +45,32 @@ try:
     from .misc import (EngineConfig, WaveRecognitionObserver,
                        get_decoder_config_object)
     from .recording import PyAudioRecorder
+    ENGINE_AVAILABLE = True
 except ImportError:
     # Import a few things here optionally for readability (the engine won't
     # start without them) and so that autodoc can import this module without
     # them.
-    pass
+    ENGINE_AVAILABLE = False
 
 
 class UnknownWordError(Exception):
     pass
 
 
-class SphinxEngine(EngineBase):
+class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
     """ Speech recognition engine back-end for CMU Pocket Sphinx. """
 
     _name = "sphinx"
-    DictationContainer = SphinxDictationContainer
+    DictationContainer = DictationContainerBase
 
     def __init__(self):
         EngineBase.__init__(self)
+        DelegateTimerManagerInterface.__init__(self)
 
         # Set up the engine logger
         logging.basicConfig()
 
-        try:
-            import sphinxwrapper
-            import jsgf
-            import pyaudio
-        except ImportError:
+        if not ENGINE_AVAILABLE:
             self._log.error("%s: Failed to import jsgf, pyaudio and/or "
                             "sphinxwrapper. Are they installed?" % self)
             raise EngineError("Failed to import Pocket Sphinx engine "
@@ -86,7 +84,7 @@ class SphinxEngine(EngineBase):
         # Set other variables
         self._decoder = None
         self._audio_buffers = []
-        self.compiler = SphinxJSGFCompiler()
+        self.compiler = SphinxJSGFCompiler(self)
         self._recognition_observer_manager = SphinxRecObsManager(self)
         self._keyphrase_thresholds = {}
         self._keyphrase_functions = {}
@@ -95,9 +93,6 @@ class SphinxEngine(EngineBase):
 
         # Timer-related members.
         self._timer_manager = SphinxTimerManager(0.02, self)
-        self._timer_callback = None
-        self._timer_interval = None
-        self._timer_next_time = 0
 
         # Set up keyphrase search names and valid search names for grammars.
         self._keyphrase_search_names = ["_key_phrases", "_wake_phrase"]
@@ -288,7 +283,7 @@ class SphinxEngine(EngineBase):
     # -----------------------------------------------------------------------
     # Multiplexing timer methods.
 
-    def create_timer(self, callback, interval):
+    def create_timer(self, callback, interval, repeating=True):
         """
         Create and return a timer using the specified callback and repeat
         interval.
@@ -300,24 +295,8 @@ class SphinxEngine(EngineBase):
             self._log.warning("Timers will not run unless the engine is "
                               "recognising audio.")
 
-        return super(SphinxEngine, self).create_timer(callback, interval)
-
-    def set_timer_callback(self, callback, sec):
-        """"""
-        # This method should really only be called by the timer manager, not
-        # directly.
-        self._timer_callback = callback
-        self._timer_interval = sec
-        self._timer_next_time = time.time()
-
-    def _call_timer_callback(self):
-        if not (callable(self._timer_callback) or self._timer_interval):
-            return
-
-        now = time.time()
-        if self._timer_next_time < now:
-            self._timer_next_time = now + self._timer_interval
-            self._timer_callback()
+        return super(SphinxEngine, self).create_timer(callback, interval,
+                                                      repeating)
 
     # -----------------------------------------------------------------------
     # Methods for working with grammars.
@@ -326,14 +305,12 @@ class SphinxEngine(EngineBase):
         """
         Check if a word is in the current Sphinx pronunciation dictionary.
 
-        This will always return False if :meth:`connect` hasn't been called.
-
         :rtype: bool
         """
-        if self._decoder:
-            return bool(self._decoder.lookup_word(word))
+        if not self._decoder:
+            self.connect()
 
-        return False
+        return bool(self._decoder.lookup_word(word.lower()))
 
     def _validate_words(self, words, search_type):
         unknown_words = []
@@ -348,12 +325,12 @@ class SphinxEngine(EngineBase):
             unknown_words.sort()
             raise UnknownWordError(
                 "%s used words not found in the pronunciation dictionary: "
-                "%s" % (search_type, ", ".join(unknown_words)))
+                "%s" % (search_type, ", ".join(unknown_words))
+            )
 
     def _build_grammar_wrapper(self, grammar):
         return GrammarWrapper(grammar, self,
-                              self._recognition_observer_manager,
-                              len(self._grammar_wrappers))
+                              self._recognition_observer_manager)
 
     def _set_grammar(self, wrapper, activate, partial=False):
         if not wrapper:
@@ -367,37 +344,35 @@ class SphinxEngine(EngineBase):
                 self._decoder.end_utterance()
                 self._decoder.active_search = wrapper.search_name
 
-        # Check if the wrapper's search_name is valid
-        if wrapper.search_name in self._valid_searches:
+        # Check if the wrapper's search name is valid.
+        # Set the search (again) if necessary.
+        valid_search = wrapper.search_name in self._valid_searches
+        if valid_search and not wrapper.set_search:
             # wrapper.search_name is a valid search, so return.
             activate_search_if_necessary()
             return
 
         # Return early if 'partial' is True as an optimisation to avoid
         # recompiling grammars for every rule activation/deactivation.
-        if partial:
+        # Also return if the search doesn't need to be set.
+        if partial or not wrapper.set_search:
             return
 
         # Compile and set the jsgf search.
         compiled = wrapper.compile_jsgf()
+        self._log.debug(compiled)
 
-        # Only set the grammar's search if there are still active rules.
+        # Raise an error if there are no active public rules.
         if "public <root> = " not in compiled:
-            return
-
-        # Check that each word in the grammar is in the pronunciation
-        # dictionary. This will raise an UnknownWordError if one or more
-        # aren't.
-        self._validate_words(wrapper.grammar_words,
-                             "grammar '%s'" % wrapper.grammar.name)
+            raise EngineError("no public rules found in the grammar")
 
         # Set the JSGF search.
         self._decoder.end_utterance()
         self._decoder.set_jsgf_string(wrapper.search_name, compiled)
         activate_search_if_necessary()
 
-        # Grammar search has been loaded, add the search name to the set.
-        self._valid_searches.add(wrapper.search_name)
+        # Grammar search has been loaded, so set the wrapper's flag.
+        wrapper.set_search = False
 
     def _unset_search(self, name):
         # Unset a Pocket Sphinx search with the given name.
@@ -497,19 +472,28 @@ class SphinxEngine(EngineBase):
                 grammar.add_dependency(d)
 
         wrapper = self._build_grammar_wrapper(grammar)
+
+        # Check that the engine doesn't already have a grammar with the same
+        # search name. This will include grammars with the same reference
+        # name, e.g. "some grammar" and "some_grammar".
+        if wrapper.search_name in self._valid_searches:
+            message = "Failed to load grammar %s: multiple grammars with " \
+                "the same name are not allowed" % grammar
+            self._log.error(message)
+            raise EngineError(message)
+
+        # Attempt to set the grammar search.
         try:
             self._set_grammar(wrapper, False)
-        except UnknownWordError as e:
-            # Unknown words should be logged as plain error messages, not
-            # exception stack traces.
-            self._log.error(e)
-            raise EngineError("Failed to load grammar %s: %s."
-                              % (grammar, e))
         except Exception as e:
             self._log.exception("Failed to load grammar %s: %s."
                                 % (grammar, e))
             raise EngineError("Failed to load grammar %s: %s."
                               % (grammar, e))
+
+        # Set the grammar wrapper's search name as valid and return the
+        # wrapper.
+        self._valid_searches.add(wrapper.search_name)
         return wrapper
 
     def _unload_grammar(self, grammar, wrapper):
@@ -534,10 +518,7 @@ class SphinxEngine(EngineBase):
             return
         try:
             wrapper.enable_rule(rule.name)
-            self._unset_search(wrapper.search_name)
             self._set_grammar(wrapper, False, True)
-        except UnknownWordError as e:
-            self._log.error(e)
         except Exception as e:
             self._log.exception("Failed to activate grammar %s: %s."
                                 % (grammar, e))
@@ -550,10 +531,7 @@ class SphinxEngine(EngineBase):
             return
         try:
             wrapper.disable_rule(rule.name)
-            self._unset_search(wrapper.search_name)
             self._set_grammar(wrapper, False, True)
-        except UnknownWordError as e:
-            self._log.error(e)
         except Exception as e:
             self._log.exception("Failed to activate grammar %s: %s."
                                 % (grammar, e))
@@ -569,7 +547,6 @@ class SphinxEngine(EngineBase):
         wrapper.update_list(lst)
 
         # Reload the grammar.
-        self._unset_search(wrapper.search_name)
         try:
             self._set_grammar(wrapper, False)
         except Exception as e:
@@ -903,7 +880,7 @@ class SphinxEngine(EngineBase):
         self._audio_buffers.append(buf)
 
         # Call the timer callback if it is set.
-        self._call_timer_callback()
+        self.call_timer_callback()
 
         # Process audio.
         try:

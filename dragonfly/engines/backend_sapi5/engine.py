@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -35,20 +35,17 @@ from datetime import datetime
 from ctypes import Structure, c_long, c_int, c_uint, pointer
 from six import string_types, integer_types
 
-try:
-    import win32con
-    from win32com.client           import Dispatch, getevents, constants
-    from win32com.client.gencache  import EnsureDispatch
-    from ctypes import windll, WinError
-except ImportError:
-    # Ignore import errors so that documentation can be built on other
-    # platforms.
-    pass
+import pythoncom
+import win32con
+from win32com.client           import Dispatch, getevents, constants
+from win32com.client.gencache  import EnsureDispatch
+from ctypes import windll, WinError, WINFUNCTYPE
+from ctypes.wintypes import DWORD, HANDLE, HWND, LONG
 
 from ..base                    import (EngineBase, EngineError,
-                                       MimicFailure, ThreadedTimerManager)
+                                       MimicFailure, DelegateTimerManager,
+                                       DelegateTimerManagerInterface, DictationContainerBase)
 from .compiler                 import Sapi5Compiler
-from .dictation                import Sapi5DictationContainer
 from .recobs                   import Sapi5RecObsManager
 from ...grammar.state          import State
 from ...grammar.recobs         import RecognitionObserver
@@ -74,6 +71,7 @@ class MimicObserver(RecognitionObserver):
     _log = logging.getLogger("SAPI5 RecObs")
 
     def __init__(self):
+        RecognitionObserver.__init__(self)
         self.status = "none"
 
     def on_recognition(self, words):
@@ -87,17 +85,18 @@ class MimicObserver(RecognitionObserver):
 
 #===========================================================================
 
-class Sapi5SharedEngine(EngineBase):
+class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
     """ Speech recognition engine back-end for SAPI 5 shared recognizer. """
 
     _name = "sapi5shared"
     recognizer_dispatch_name = "SAPI.SpSharedRecognizer"
-    DictationContainer = Sapi5DictationContainer
+    DictationContainer = DictationContainerBase
 
     #-----------------------------------------------------------------------
 
     def __init__(self, retain_dir=None):
         EngineBase.__init__(self)
+        DelegateTimerManagerInterface.__init__(self)
 
         EnsureDispatch(self.recognizer_dispatch_name)
         EnsureDispatch("SAPI.SpVoice")
@@ -106,7 +105,7 @@ class Sapi5SharedEngine(EngineBase):
         self._compiler    = None
 
         self._recognition_observer_manager = Sapi5RecObsManager(self)
-        self._timer_manager = ThreadedTimerManager(0.02, self)
+        self._timer_manager = DelegateTimerManager(0.02, self)
 
         if isinstance(retain_dir, string_types) or retain_dir is None:
             self._retain_dir = retain_dir
@@ -212,9 +211,14 @@ class Sapi5SharedEngine(EngineBase):
     def set_exclusiveness(self, grammar, exclusive):
         self._log.debug("Setting exclusiveness of grammar %s to %s."
                         % (grammar.name, exclusive))
-        grammar_handle = self._get_grammar_wrapper(grammar).handle
-        grammar_handle.State = constants.SGSExclusive
-       # grammar_handle.SetGrammarState(constants.SPGS_EXCLUSIVE)
+        wrapper = self._get_grammar_wrapper(grammar)
+        if exclusive:
+            wrapper.state_before_exclusive = wrapper.handle.State
+            wrapper.handle.State = constants.SGSExclusive
+        elif wrapper.handle.State == constants.SGSExclusive:
+            assert wrapper.state_before_exclusive in (constants.SGSEnabled, constants.SGSDisabled)
+            wrapper.handle.State = wrapper.state_before_exclusive
+        # grammar_handle.SetGrammarState(constants.SPGS_EXCLUSIVE)
 
 
     #-----------------------------------------------------------------------
@@ -241,7 +245,7 @@ class Sapi5SharedEngine(EngineBase):
         if timeout != None:
             begin_time = time.time()
             windll.user32.SetTimer(NULL, NULL, int(timeout * 1000), NULL)
-    
+
         message = MSG()
         message_pointer = pointer(message)
         while (not timeout) or (time.time() - begin_time < timeout):
@@ -286,6 +290,75 @@ class Sapi5SharedEngine(EngineBase):
     def _get_language(self):
         return "en"
 
+    def process_grammars_context(self, window=None):
+        """
+            Enable/disable grammars & rules based on their current contexts.
+
+            This must be done preemptively because WSR doesn't allow doing it
+            upon/after the utterance start has been detected. The engine
+            should call this automatically whenever the foreground application
+            (or its title) changes. But the user may want to call this
+            manually to update when custom contexts.
+
+            The *window* parameter is optional window information, which can
+            be passed in as an optimization if it has already been gathered.
+
+        """
+
+        if window is None: window = Window.get_foreground()
+        for grammar in self.grammars:
+            # Prevent 'notify_begin()' from being called.
+            if grammar.name == "_recobs_grammar":
+                continue
+            grammar.process_begin(window.executable, window.title,
+                                  window.handle)
+
+    def recognize_forever(self):
+        """
+            Recognize speech in a loop.
+
+            This will also call any scheduled timer functions and ensure that
+            the correct window context is used.
+
+        """
+
+        # Register for window change events to activate/deactivate grammars
+        # and rules on window changes. This is done here because the SAPI5
+        # 'OnPhraseStart' grammar callback is called after grammar state
+        # changes are allowed.
+        WinEventProcType = WINFUNCTYPE(None, HANDLE, DWORD, HWND, LONG,
+                                       LONG, DWORD, DWORD)
+
+        self._last_foreground_window = None
+
+        def callback(hWinEventHook, event, hwnd, idObject, idChild,
+                     dwEventThread, dwmsEventTime):
+            window = Window.get_foreground()
+            # Note: hwnd doesn't always match window.handle, even when
+            # foreground window changed (and sometimes it didn't change)
+            if window != self._last_foreground_window:
+                self.process_grammars_context(window)
+                self._last_foreground_window = window
+
+        def set_hook(win_event_proc, event_type):
+            return windll.user32.SetWinEventHook(
+                event_type, event_type, 0, win_event_proc, 0, 0,
+                win32con.WINEVENT_OUTOFCONTEXT)
+
+        win_event_proc = WinEventProcType(callback)
+        windll.user32.SetWinEventHook.restype = HANDLE
+
+        [set_hook(win_event_proc, et) for et in
+         {win32con.EVENT_SYSTEM_FOREGROUND,
+          win32con.EVENT_OBJECT_NAMECHANGE, }]
+
+        # Recognize speech, call timer functions and handle window change
+        # events in a loop.
+        self.speak('beginning loop!')
+        while 1:
+            pythoncom.PumpWaitingMessages()
+            self.call_timer_callback()
+            time.sleep(0.005)
 
 #---------------------------------------------------------------------------
 # Make the shared engine available as Sapi5Engine, for backwards
@@ -402,6 +475,7 @@ class GrammarWrapper(object):
         self.engine = engine
         self.context = context
         self.recobs_manager = recobs_manager
+        self.state_before_exclusive = handle.State
 
         # Register callback functions which will handle recognizer events.
         base = getevents("SAPI.SpSharedRecoContext")
