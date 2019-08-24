@@ -18,7 +18,10 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
+import logging
 import sys
+
+logging.basicConfig()
 
 # --------------------------------------------------------------------------
 from .config            import Config, Section, Item
@@ -35,7 +38,7 @@ from .grammar.rule_compound      import CompoundRule
 from .grammar.rule_mapping       import MappingRule
 from .grammar.elements  import (ElementBase, Sequence, Alternative,
                                 Optional, Repetition, Literal,
-                                ListRef, DictListRef, Dictation,
+                                ListRef, DictListRef, Dictation, Modifier,
                                 RuleRef, RuleWrap, Empty, Compound, Choice)
 
 from .grammar.context   import Context, AppContext, FuncContext
