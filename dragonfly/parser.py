@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -34,8 +34,10 @@ type of input they are meant to process.
 
 import string
 import re
+import locale
 import logging
-from six import string_types, text_type, PY2
+
+from six import string_types, text_type, binary_type
 
 
 class ParserError(Exception):
@@ -288,8 +290,8 @@ class Node(object):
         self.children = []
 
     def __str__(self):
-        if PY2:
-            data = text_type(self.data).encode("utf-8")
+        if isinstance(self.data, binary_type):
+            data = self.data.decode(locale.getpreferredencoding())
         else:
             data = text_type(self.data)
         return "Node: %s, %s" % (self.actor, data)

@@ -18,21 +18,22 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
+import locale
 import logging
 
-from six import string_types, text_type, PY2
+from six import string_types, binary_type
 
 import dragonfly.grammar.state as state_
 from dragonfly import Window
 
 from .recobs import TextRecobsManager
-from ..base import (EngineBase, EngineError, MimicFailure,
-                    ThreadedTimerManager, DictationContainerBase)
+from ..base import (EngineBase, MimicFailure, ThreadedTimerManager,
+                    DictationContainerBase)
 
 
 def _map_word(word):
-    if PY2 and isinstance(word, str):
-        word = text_type(word, encoding="utf-8")
+    if isinstance(word, binary_type):
+        word = word.decode(locale.getpreferredencoding())
     if word.isupper():
         # Convert dictation words to lowercase for consistent output.
         return word.lower(), 1000000
@@ -86,14 +87,6 @@ class TextInputEngine(EngineBase):
         """ Load the given *grammar* and return a wrapper. """
         self._log.debug("Engine %s: loading grammar %s."
                         % (self, grammar.name))
-
-        grammar.engine = self
-        # Dependency checking.
-        memo = []
-        for r in grammar.rules:
-            for d in r.dependencies(memo):
-                grammar.add_dependency(d)
-
         return self._build_grammar_wrapper(grammar)
 
     def _unload_grammar(self, grammar, wrapper):

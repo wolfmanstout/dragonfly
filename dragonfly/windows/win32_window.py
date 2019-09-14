@@ -59,13 +59,19 @@ class Win32Window(BaseWindow):
     @classmethod
     def get_all_windows(cls):
         def function(handle, argument):
-            argument.append(Win32Window(handle))
+            argument.append(cls.get_window(handle))
         argument = []
         win32gui.EnumWindows(function, argument)
         return argument
 
     @classmethod
     def get_matching_windows(cls, executable=None, title=None):
+        # Make window searches case-insensitive.
+        if executable:
+            executable = executable.lower()
+        if title:
+            title = title.lower()
+
         matching = []
         for window in cls.get_all_windows():
             if not window.is_visible:
@@ -133,7 +139,12 @@ class Win32Window(BaseWindow):
     is_enabled      = _win32gui_test("IsWindowEnabled")
     is_visible      = _win32gui_test("IsWindowVisible")
     is_minimized    = _win32gui_test("IsIconic")
-#   is_maximized    = _win32gui_test("IsZoomed")  # IsZoomed is unavailable
+
+    @property
+    def is_maximized(self):
+        # IsZoomed() is not available from win32gui for some reason.
+        # So we use the function directly.
+        return bool(windll.user32.IsZoomed(self._handle))
 
     def _win32gui_show_window(state):
         return lambda self: win32gui.ShowWindow(self._handle, state)

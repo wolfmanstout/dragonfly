@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -27,20 +27,22 @@ NaturallySpeaking engine.
 
 """
 
+from locale import getpreferredencoding
+import logging
+import re
 
 # Attempt to import Natlink.  If this fails, Natlink is probably
 #  not available and the dictation container implemented here
 #  cannot be used.  However, we don't raise an exception because
 #  this file should still be importable for documentation purposes.
-from six import text_type, string_types
 
 try:
     import natlink
 except ImportError:
     natlink = None
 
-import logging
-import re
+from six import text_type, binary_type, string_types
+
 import dragonfly.engines
 
 
@@ -67,7 +69,7 @@ class FlagContainer(object):
         return u"%s(%s)" % (self.__class__.__name__, self.flags_string())
 
     def __str__(self):
-        return self.__unicode__().encode("utf-8")
+        return self.__unicode__().encode(getpreferredencoding())
 
     def __getattr__(self, name):
         if name not in self.flag_names:
@@ -189,7 +191,7 @@ class Word(object):
         return u"%s(%s)" % (self.__class__.__name__, ", ".join(info))
 
     def __str__(self):
-        return self.__unicode__().encode("utf-8")
+        return self.__unicode__().encode(getpreferredencoding())
 
 
 #===========================================================================
@@ -341,13 +343,13 @@ class WordParserDns11(WordParserBase):
         "open paren":       WordFlags("no_space_after"),
         "close paren":       WordFlags("no_space_before"),
         "slash":            WordFlags("no_space_after", "no_space_before"),
-        
+
         # below are two examples of Dragon custom vocabulary with formatting
         # these would have to be added to the Dragon vocabulary for users to use them
         # "len":              WordFlags("no_space_after"), # shorter name for (
         # "ren":              WordFlags("no_space_before"), # shorter name for )
     }
-    
+
     def create_word_flags(self, property):
         if not property:
             # None indicates the word is not in DNS' vocabulary.
@@ -363,7 +365,7 @@ class WordParserDns11(WordParserBase):
             flags = WordFlags()
         return flags
 
-    
+
     def parse_input(self, input):
         # Not unicode (Python 2) or str (Python 3)
         if not isinstance(input, text_type):

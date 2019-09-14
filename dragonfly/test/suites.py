@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -65,6 +65,7 @@ language_names = [
 
 # Define the tests to run for DNS versions 10 and below.
 natlink_10_names = [
+    "test_compiler_natlink",
     "test_dictation",
     "test_engine_natlink",
     "doc:documentation/test_word_formatting_v10_doctest.txt",
@@ -72,6 +73,7 @@ natlink_10_names = [
 
 # Define the tests to run for DNS versions 11 and above.
 natlink_11_names = [
+    "test_compiler_natlink",
     "test_dictation",
     "test_engine_natlink",
     "doc:documentation/test_word_formatting_v11_doctest.txt",
@@ -89,6 +91,7 @@ sapi5_names.remove("doc:documentation/test_recobs_doctest.txt")
 sphinx_names = [
     "test_engine_sphinx",
     "test_language_en_number",
+    "test_dictation",
 ] + common_names
 
 kaldi_names = [
@@ -101,7 +104,7 @@ kaldi_names.remove("doc:documentation/test_recobs_doctest.txt")
 text_names = [
     "test_contexts",
     "test_engine_text",
-    "test_engine_text_dictation",
+    "test_dictation",
 ] + common_names + language_names
 
 # ==========================================================================
