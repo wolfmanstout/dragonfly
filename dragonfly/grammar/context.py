@@ -124,7 +124,7 @@ class Context(object):
     def __init__(self):
         self._str = ""
 
-    def __str__(self):
+    def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__, self._str)
 
     def copy(self):
@@ -266,7 +266,7 @@ class AppContext(Context):
         for key, value in kwargs.items():
             if isinstance(value, string_types):
                 values = [value.lower()]
-            if isinstance(value, list):
+            elif isinstance(value, list):
                 values = [str(v).lower() for v in value]
             elif value is None:
                 values = None

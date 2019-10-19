@@ -74,9 +74,11 @@ setup(
                         # "python-libxdo;platform_system=='Linux'",
                         # "Xlib;platform_system=='Linux'",
                         "psutil >= 5.5.1;platform_system=='Linux'",
+                        "pynput >= 1.4.2;platform_system=='Linux'",
 
                         # Mac OS dependencies.
                         "pynput >= 1.4.2;platform_system=='Darwin'",
+                        "pyobjc >= 5.2;platform_system=='Darwin'",
 
                         # RPC requirements
                         "json-rpc",
@@ -91,7 +93,7 @@ setup(
                      "pyaudio"
                     ],
           "kaldi": [
-                    "kaldi-active-grammar ~= 0.7.4",
+                    "kaldi-active-grammar ~= %s" % read("dragonfly", "engines", "backend_kaldi", "kag_version.txt").strip(),
                     "pyaudio == 0.2.*",
                     "webrtcvad == 2.0.*",
                    ],

@@ -11,6 +11,44 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
+0.18.0_ - 2019-10-13
+--------------------
+
+Added
+~~~~~
+* Add grammar/rule weights support for the Kaldi backend
+  (thanks `@daanzu`_).
+* Add new functions for recognition state change callbacks.
+* Add optional --delay argument to Dragonfly's test command (CLI).
+* Allow the passing of window attributes to text engine mimic
+  (thanks `@mrob95`_).
+
+Changed
+~~~~~~~
+* Add magic repr methods for debugging (thanks `@mrob95`_).
+* Add pyobjc as a required package on Mac OS (for AppKit).
+* Improve Kaldi backend performance by parsing directly on the FST instead
+  of with pyparsing (thanks `@daanzu`_).
+* Make Kaldi backend work with Python 3 (thanks `@daanzu`_).
+* Make other various improvements to the Kaldi backend (thanks `@daanzu`_).
+* Make the Monitor class and list work on X11 (Linux) & Mac OS.
+* Make the Mouse action work on X11 (Linux) & Mac OS.
+* Move 3 monitor-related methods from Win32Window to BaseWindow.
+
+Fixed
+~~~~~
+* Change Sphinx and text engines to not accept mimicking of non-exported
+  rules (expected behaviour).
+* Fix CompoundRule bug where the 'exported' parameter was effectively
+  ignored.
+* Fix Natlink engine bug where Canadian English isn't recognised
+  (thanks `@dusty-phillips`_).
+* Fix Natlink engine for all variants of supported languages.
+* Fix case sensitivity bug with AppContext keyword arguments.
+* Fix quite a few bugs with the Kaldi backend (thanks `@daanzu`_).
+* Fix two bugs with the text engine's mimic method (thanks `@mrob95`_).
+
+
 0.17.0_ - 2019-09-12
 --------------------
 
@@ -20,6 +58,8 @@ Added
   (thanks `@wolfmanstout`_).
 * Add keywords argument handling to AppContext class for matching window
   attributes other than titles and executables.
+* Add the ability to set formatting flags for natlink dictation containers
+  (thanks `@alexboche`_).
 
 Changed
 ~~~~~~~
@@ -570,7 +610,8 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.17.0...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.18.0...HEAD
+.. _0.18.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.17.0...0.18.0
 .. _0.17.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.16.1...0.17.0
 .. _0.16.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.16.0...0.16.1
 .. _0.16.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.15.0...0.16.0
@@ -599,9 +640,11 @@ This release is the first in the Git version control system.
 .. _@JasoonS: https://github.com/JasoonS
 .. _@LexiconCode: https://github.com/LexiconCode
 .. _@Versatilus: https://github.com/Versatilus
+.. _@alexboche: https://github.com/alexboche
 .. _@calmofthestorm: https://github.com/calmofthestorm
 .. _@comodoro: https://github.com/comodoro
 .. _@daanzu: https://github.com/daanzu
+.. _@dusty-phillips: https://github.com/dusty-phillips
 .. _@lexxish: https://github.com/lexxish
 .. _@mrob95: https://github.com/mrob95
 .. _@tylercal: https://github.com/tylercal
