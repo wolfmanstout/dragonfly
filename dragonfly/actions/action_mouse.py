@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -22,19 +22,19 @@
 Mouse action
 ============================================================================
 
-This section describes the :class:`Mouse` action object.  This type of 
+This section describes the :class:`Mouse` action object.  This type of
 action is used for controlling the mouse cursor and clicking mouse
 button.
 
-Below you'll find some simple examples of :class:`Mouse` usage, followed 
+Below you'll find some simple examples of :class:`Mouse` usage, followed
 by a detailed description of the available mouse events.
 
 
 Example mouse actions
 ............................................................................
 
-The following code moves the mouse cursor to the center of the foreground 
-window (``(0.5, 0.5)``) and then clicks the left mouse button once 
+The following code moves the mouse cursor to the center of the foreground
+window (``(0.5, 0.5)``) and then clicks the left mouse button once
 (``left``)::
 
     # Parentheses ("(...)") give foreground-window-relative locations.
@@ -44,8 +44,8 @@ window (``(0.5, 0.5)``) and then clicks the left mouse button once
     action = Mouse("(0.5, 0.5), left")
     action.execute()
 
-The line below moves the mouse cursor to 100 pixels left of the desktop's 
-right edge and 250 pixels down from its top edge (``[-100, 250]``), and 
+The line below moves the mouse cursor to 100 pixels left of the desktop's
+right edge and 250 pixels down from its top edge (``[-100, 250]``), and
 then double clicks the right mouse button (``right:2``)::
 
     # Square brackets ("[...]") give desktop-relative locations.
@@ -54,8 +54,8 @@ then double clicks the right mouse button (``right:2``)::
     #  bottom-edge of the desktop or window.
     Mouse("[-100, 250], right:2").execute()
 
-The following command drags the mouse from the top right corner of the 
-foreground window (``(0.9, 10), left:down``) to the bottom left corner 
+The following command drags the mouse from the top right corner of the
+foreground window (``(0.9, 10), left:down``) to the bottom left corner
 (``(25, -0.1), left:up``)::
 
     Mouse("(0.9, 10), left:down, (25, -0.1), left:up").execute()
@@ -71,9 +71,9 @@ The code below moves the mouse cursor 25 pixels right and 25 pixels up
 Mouse specification format
 ............................................................................
 
-The *spec* argument passed to the :class:`Mouse` constructor specifies 
-which mouse events will be emulated.  It is a string consisting of one or 
-more comma-separated elements.  Each of these elements has one of the 
+The *spec* argument passed to the :class:`Mouse` constructor specifies
+which mouse events will be emulated.  It is a string consisting of one or
+more comma-separated elements.  Each of these elements has one of the
 following possible formats:
 
 Mouse movement actions:
@@ -85,7 +85,7 @@ Mouse movement actions:
  - move the cursor relative to its current position:
    ``<`` *pixels* ``,`` *pixels* ``>``
 
-In the above specifications, the *number* and *pixels* have the 
+In the above specifications, the *number* and *pixels* have the
 following meanings:
 
  - *number* -- can specify a number of pixels or a fraction of
@@ -148,133 +148,16 @@ Mouse class reference
 
 """
 
-import time
-import win32con
-
-from ctypes             import windll, pointer, c_long, c_ulong, Structure
-from .sendinput         import MouseInput, make_input_array, send_input_array
 from .action_base       import DynStrActionBase, ActionError
 from ..windows.window   import Window
-from ..windows.monitor  import monitors
 
+from .mouse import (ButtonEvent, PauseEvent, MoveRelativeEvent,
+                    MoveScreenEvent, MoveWindowEvent, PLATFORM_BUTTON_FLAGS,
+                    PLATFORM_WHEEL_FLAGS)
 
-#---------------------------------------------------------------------------
+# Imported for backwards-compatibility: these functions used to live here.
+from .mouse import get_cursor_position, set_cursor_position
 
-MOUSEEVENTF_HWHEEL = 0x1000 # taken from https://msdn.microsoft.com/en-us/library/windows/desktop/ms646273(v=vs.85).aspx
-
-#---------------------------------------------------------------------------
-
-class _point_t(Structure):
-    _fields_ = [
-                ('x',  c_long),
-                ('y',  c_long),
-               ]
-
-def get_cursor_position():
-    point = _point_t()
-    result = windll.user32.GetCursorPos(pointer(point))
-    if result:  return (point.x, point.y)
-    else:       return None
-
-def set_cursor_position(x, y):
-    result = windll.user32.SetCursorPos(c_long(int(x)), c_long(int(y)))
-    if result:  return False
-    else:       return True
-
-
-#---------------------------------------------------------------------------
-
-class _EventBase(object):
-
-    def execute():
-        pass
-
-
-class _Move(_EventBase):
-
-    def __init__(self, from_left, horizontal, from_top, vertical):
-        self.from_left = from_left
-        self.horizontal = horizontal
-        self.from_top = from_top
-        self.vertical = vertical
-        _EventBase.__init__(self)
-
-    def _move_relative(self, rectangle):
-        if self.from_left:  horizontal = rectangle.x1
-        else:               horizontal = rectangle.x2
-        if isinstance(self.horizontal, float):
-            distance = self.horizontal * rectangle.dx
-        else:
-            distance = self.horizontal
-        horizontal += distance
-
-        if self.from_top:   vertical = rectangle.y1
-        else:               vertical = rectangle.y2
-        if isinstance(self.vertical, float):
-            distance = self.vertical * rectangle.dy
-        else:
-            distance = self.vertical
-        vertical += distance
-
-        self._move_mouse(horizontal, vertical)
-
-    def _move_mouse(self, horizontal, vertical):
-        set_cursor_position(horizontal, vertical)
-
-
-class _MoveWindow(_Move):
-
-    def execute(self, window):
-        self._move_relative(window.get_position())
-
-
-class _MoveScreen(_Move):
-
-    def execute(self, window):
-        self._move_relative(monitors[0].rectangle)
-
-
-class _MoveRelative(_Move):
-
-    def __init__(self, horizontal, vertical):
-        _Move.__init__(self, None, None, None, None)
-        self.horizontal = horizontal
-        self.vertical = vertical
-
-    def execute(self, window):
-        position = get_cursor_position()
-        if not position:
-            raise ActionError("Failed to retrieve cursor position.")
-        horizontal = position[0] + self.horizontal
-        vertical   = position[1] + self.vertical
-        self._move_mouse(horizontal, vertical)
-
-
-class _Button(_EventBase):
-
-    def __init__(self, *flags):
-        _EventBase.__init__(self)
-        self._flags = flags
-
-    def execute(self, window):
-        zero = pointer(c_ulong(0))
-        inputs = [MouseInput(0, 0, flag[1], flag[0], 0, zero)
-                  for flag in self._flags]
-        array = make_input_array(inputs)
-        send_input_array(array)
-
-
-class _Pause(_EventBase):
-
-    def __init__(self, interval):
-        _EventBase.__init__(self)
-        self._interval = interval
-
-    def execute(self, window):
-        time.sleep(self._interval)
-
-
-#---------------------------------------------------------------------------
 
 class Mouse(DynStrActionBase):
     """ Action that sends mouse events. """
@@ -322,7 +205,7 @@ class Mouse(DynStrActionBase):
         if not spec.startswith("(") or not spec.endswith(")"):
             return False
         h_origin, h_value, v_origin, v_value = self._parse_position_pair(spec[1:-1])
-        event = _MoveWindow(h_origin, h_value, v_origin, v_value)
+        event = MoveWindowEvent(h_origin, h_value, v_origin, v_value)
         events.append(event)
         return True
 
@@ -330,7 +213,7 @@ class Mouse(DynStrActionBase):
         if not spec.startswith("[") or not spec.endswith("]"):
             return False
         h_origin, h_value, v_origin, v_value = self._parse_position_pair(spec[1:-1])
-        event = _MoveScreen(h_origin, h_value, v_origin, v_value)
+        event = MoveScreenEvent(h_origin, h_value, v_origin, v_value)
         events.append(event)
         return True
 
@@ -342,33 +225,12 @@ class Mouse(DynStrActionBase):
             return False
         horizontal = int(parts[0])
         vertical   = int(parts[1])
-        event = _MoveRelative(horizontal, vertical)
+        event = MoveRelativeEvent(horizontal, vertical)
         events.append(event)
         return True
 
-    _button_flags = {
-                     "left":   ((win32con.MOUSEEVENTF_LEFTDOWN, 0),
-                                (win32con.MOUSEEVENTF_LEFTUP, 0)),
-                     "right":  ((win32con.MOUSEEVENTF_RIGHTDOWN, 0),
-                                (win32con.MOUSEEVENTF_RIGHTUP, 0)),
-                     "middle": ((win32con.MOUSEEVENTF_MIDDLEDOWN, 0),
-                                (win32con.MOUSEEVENTF_MIDDLEUP, 0)),
-                     "four": ((win32con.MOUSEEVENTF_XDOWN, 1),
-                                (win32con.MOUSEEVENTF_XUP, 1)),
-                     "five": ((win32con.MOUSEEVENTF_XDOWN, 2),
-                                (win32con.MOUSEEVENTF_XUP, 2)),
-                    }
-
-    _wheel_flags = {
-                    "wheelup": (win32con.MOUSEEVENTF_WHEEL, 120),
-                    "stepup": (win32con.MOUSEEVENTF_WHEEL, 40),
-                    "wheeldown": (win32con.MOUSEEVENTF_WHEEL, -120),
-                    "stepdown": (win32con.MOUSEEVENTF_WHEEL, -40),
-                    "wheelright": (MOUSEEVENTF_HWHEEL, 120),
-                    "stepright": (MOUSEEVENTF_HWHEEL, 40),
-                    "wheelleft": (MOUSEEVENTF_HWHEEL, -120),
-                    "stepleft": (MOUSEEVENTF_HWHEEL, -40),
-                   }
+    _button_flags = PLATFORM_BUTTON_FLAGS
+    _wheel_flags = PLATFORM_WHEEL_FLAGS
 
     def _process_button(self, spec, events):
         parts = spec.split(":", 1)
@@ -380,16 +242,16 @@ class Mouse(DynStrActionBase):
             flag_down, flag_up = self._button_flags[button]
 
             if special == "down":
-                event = _Button(flag_down)
+                event = ButtonEvent(flag_down)
             elif special == "up":
-                event = _Button(flag_up)
+                event = ButtonEvent(flag_up)
             else:
                 try:
                     repeat = int(special)
                 except ValueError:
                     return False
                 flag_series = (flag_down, flag_up) * repeat
-                event = _Button(*flag_series)
+                event = ButtonEvent(*flag_series)
         elif button in self._wheel_flags:
             flag = self._wheel_flags[button]
             try:
@@ -397,7 +259,7 @@ class Mouse(DynStrActionBase):
             except ValueError:
                 return False
             flag = (flag[0], repeat * flag[1])
-            event = _Button(flag)
+            event = ButtonEvent(flag)
         else:
             return False
 
@@ -408,7 +270,7 @@ class Mouse(DynStrActionBase):
         if not spec.startswith("/"):
             return False
         interval = float(spec[1:]) / 100
-        event = _Pause(interval)
+        event = PauseEvent(interval)
         events.append(event)
         return True
 

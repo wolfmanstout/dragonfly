@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -34,8 +34,10 @@ type of input they are meant to process.
 
 import string
 import re
+import locale
 import logging
-from six import string_types, text_type, PY2
+
+from six import string_types, text_type, binary_type
 
 
 class ParserError(Exception):
@@ -105,7 +107,7 @@ class State(object):
         self._stack = []
         self._previous_index = None
 
-    def __str__(self):
+    def __repr__(self):
         return self.position_string()
 
     #-----------------------------------------------------------------------
@@ -287,9 +289,9 @@ class Node(object):
         self.success_value = value
         self.children = []
 
-    def __str__(self):
-        if PY2:
-            data = text_type(self.data).encode("utf-8")
+    def __repr__(self):
+        if isinstance(self.data, binary_type):
+            data = self.data.decode(locale.getpreferredencoding())
         else:
             data = text_type(self.data)
         return "Node: %s, %s" % (self.actor, data)
@@ -357,7 +359,7 @@ class ParserElementBase(object):
         else:
             return "%s(%s)" % (self.__class__.__name__, argument)
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("...")
 
     name = property(lambda self: self._name,
@@ -391,7 +393,7 @@ class Sequence(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("%d children" % len(self._children))
 
     def _get_children(self):
@@ -463,7 +465,7 @@ class Repetition(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("")
 
     def _get_children(self):
@@ -528,7 +530,7 @@ class Alternative(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("%d children" % len(self._children))
 
     def _get_children(self):
@@ -590,7 +592,7 @@ class Optional(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("")
 
     def _get_children(self):
@@ -669,7 +671,7 @@ class String(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("%s" % self._string)
 
     #-----------------------------------------------------------------------
@@ -706,7 +708,7 @@ class CharacterSeries(ParserElementBase):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("%s" % self._set)
 
     #-----------------------------------------------------------------------
@@ -767,7 +769,7 @@ class Choice(Alternative):
     #-----------------------------------------------------------------------
     # Methods for runtime introspection.
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("%d choices" % len(self._choice_pairs))
 
     #-----------------------------------------------------------------------
@@ -789,7 +791,7 @@ class Whitespace(CharacterSeries):
         set = string.whitespace
         CharacterSeries.__init__(self, set, optional=optional, name=name)
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("")
 
 
@@ -801,7 +803,7 @@ class Letters(CharacterSeries):
         pattern = re.compile(r"\w", re.UNICODE)
         CharacterSeries.__init__(self, None, name=name, pattern=pattern)
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("")
 
     def char_matches(self, c):
@@ -819,7 +821,7 @@ class Alphanumerics(CharacterSeries):
         pattern = re.compile(r"\w", re.UNICODE)
         CharacterSeries.__init__(self, None, name=name, pattern=pattern)
 
-    def __str__(self):
+    def __repr__(self):
         return self._str("")
 
 

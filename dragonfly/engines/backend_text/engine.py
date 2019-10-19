@@ -18,21 +18,22 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
+import locale
 import logging
 
-from six import string_types, text_type, PY2
+from six import string_types, binary_type
 
 import dragonfly.grammar.state as state_
 from dragonfly import Window
 
 from .recobs import TextRecobsManager
-from ..base import (EngineBase, EngineError, MimicFailure,
-                    ThreadedTimerManager, DictationContainerBase)
+from ..base import (EngineBase, MimicFailure, ThreadedTimerManager,
+                    DictationContainerBase)
 
 
 def _map_word(word):
-    if PY2 and isinstance(word, str):
-        word = text_type(word, encoding="utf-8")
+    if isinstance(word, binary_type):
+        word = word.decode(locale.getpreferredencoding())
     if word.isupper():
         # Convert dictation words to lowercase for consistent output.
         return word.lower(), 1000000
@@ -86,14 +87,6 @@ class TextInputEngine(EngineBase):
         """ Load the given *grammar* and return a wrapper. """
         self._log.debug("Engine %s: loading grammar %s."
                         % (self, grammar.name))
-
-        grammar.engine = self
-        # Dependency checking.
-        memo = []
-        for r in grammar.rules:
-            for d in r.dependencies(memo):
-                grammar.add_dependency(d)
-
         return self._build_grammar_wrapper(grammar)
 
     def _unload_grammar(self, grammar, wrapper):
@@ -121,16 +114,11 @@ class TextInputEngine(EngineBase):
         pass
 
     def set_exclusiveness(self, grammar, exclusive):
-        # Disable/enable each grammar.
-        for g in self.grammars:
-            if exclusive:
-                g.disable()
-            else:
-                g.enable()
+        wrapper = self._get_grammar_wrapper(grammar)
+        if not wrapper:
+            return
 
-        # Enable the specified grammar if it was supposed to be exclusive.
-        if exclusive:
-            grammar.enable()
+        wrapper.exclusive = exclusive
 
     # -----------------------------------------------------------------------
     # Miscellaneous methods.
@@ -142,7 +130,7 @@ class TextInputEngine(EngineBase):
         # Minor note: this won't work for languages without capitalisation.
         return tuple(map(_map_word, words))
 
-    def mimic(self, words):
+    def mimic(self, words, **kwargs):
         """ Mimic a recognition of the given *words*. """
         # Handle string input.
         if isinstance(words, string_types):
@@ -159,12 +147,39 @@ class TextInputEngine(EngineBase):
         # Generate the input for process_words.
         words_rules = self.generate_words_rules(words)
 
-        # Call process_begin and process_words for all grammar wrappers,
-        # stopping early if processing occurred.
-        fg_window = Window.get_foreground()
+        w = Window.get_foreground()
+        process_args = {
+            "executable": w.executable,
+            "title": w.title,
+            "handle": w.handle,
+        }
+        # Allows optional passing of window attributes to mimic
+        process_args.update(kwargs)
+
+        # Call process_begin() for each grammar wrapper. Use a copy of
+        # _grammar_wrappers in case it changes.
+        for wrapper in self._grammar_wrappers.copy().values():
+            wrapper.process_begin(**process_args)
+
+        # Take another copy of _grammar_wrappers to use for processing.
+        grammar_wrappers = self._grammar_wrappers.copy().values()
+
+        # Count exclusive grammars.
+        exclusive_count = 0
+        for wrapper in grammar_wrappers:
+            if wrapper.exclusive:
+                exclusive_count += 1
+
+        # Call process_words() for each grammar wrapper, stopping early if
+        # processing occurred.
         processing_occurred = False
-        for wrapper in self._grammar_wrappers.values():
-            wrapper.process_begin(fg_window)
+        for wrapper in grammar_wrappers:
+            # Skip non-exclusive grammars if there are one or more exclusive
+            # grammars.
+            if exclusive_count > 0 and not wrapper.exclusive:
+                continue
+
+            # Process the grammar.
             processing_occurred = wrapper.process_words(words_rules)
             if processing_occurred:
                 break
@@ -209,10 +224,10 @@ class GrammarWrapper(object):
         self.grammar = grammar
         self.engine = engine
         self._observer_manager = observer_manager
+        self.exclusive = False
 
-    def process_begin(self, fg_window):
-        self.grammar.process_begin(fg_window.executable, fg_window.title,
-                                   fg_window.handle)
+    def process_begin(self, executable, title, handle):
+        self.grammar.process_begin(executable, title, handle)
 
     def process_words(self, words):
         # Return early if the grammar is disabled or if there are no active
@@ -246,7 +261,7 @@ class GrammarWrapper(object):
         # recognition and return.
         s = state_.State(words, self.grammar.rule_names, self.engine)
         for r in self.grammar.rules:
-            if not r.active:
+            if not (r.active and r.exported):
                 continue
             s.initialize_decoding()
             for _ in r.decode(s):

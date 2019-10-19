@@ -23,6 +23,7 @@ Window class for X11
 
 """
 
+import locale
 import logging
 from subprocess import Popen, PIPE
 
@@ -78,10 +79,11 @@ class X11Window(BaseWindow):
             stdout, stderr = p.communicate()
 
             # Decode output if it is binary.
+            encoding = locale.getpreferredencoding()
             if isinstance(stdout, binary_type):
-                stdout = stdout.decode('utf-8')
+                stdout = stdout.decode(encoding)
             if isinstance(stderr, binary_type):
-                stderr = stderr.decode('utf-8')
+                stderr = stderr.decode(encoding)
 
             # Handle non-zero return codes.
             if p.wait() > 0 and error_on_failure:
@@ -93,8 +95,10 @@ class X11Window(BaseWindow):
             # Return the process output and return code.
             return stdout.rstrip(), stderr.rstrip(), p.returncode
         except Exception as e:
-            cls._log.error("Failed to execute command '%s': %s",
-                           full_readable_command, e)
+            cls._log.error("Failed to execute command '%s': %s. Is "
+                           "%s installed?",
+                           full_readable_command, e, command)
+            raise e
 
     #-----------------------------------------------------------------------
     # Class methods to create new Window objects.
@@ -124,6 +128,12 @@ class X11Window(BaseWindow):
 
     @classmethod
     def get_matching_windows(cls, executable=None, title=None):
+        # Make window searches case-insensitive.
+        if executable:
+            executable = executable.lower()
+        if title:
+            title = title.lower()
+
         # Get matching window IDs using 'xdotool search'.
         args = ['search', '--onlyvisible', '--name']
         if title:
@@ -153,7 +163,7 @@ class X11Window(BaseWindow):
         self._pid = -1  # initialized later if required
         self._executable = -1
 
-    def __str__(self):
+    def __repr__(self):
         args = ["id=%d" % self._id] + list(self._names)
         return "%s(%s)" % (self.__class__.__name__, ", ".join(args))
 

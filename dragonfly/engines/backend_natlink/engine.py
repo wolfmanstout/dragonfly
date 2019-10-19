@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -95,18 +95,11 @@ class NatlinkEngine(EngineBase):
         self._log.debug("Engine %s: loading grammar %s."
                         % (self, grammar.name))
 
-        grammar.engine = self
         grammar_object = self.natlink.GramObj()
         wrapper = GrammarWrapper(grammar, grammar_object, self)
         grammar_object.setBeginCallback(wrapper.begin_callback)
         grammar_object.setResultsCallback(wrapper.results_callback)
         grammar_object.setHypothesisCallback(None)
-
-        # Dependency checking.
-        memo = []
-        for r in grammar._rules:
-            for d in r.dependencies(memo):
-                grammar.add_dependency(d)
 
         c = NatlinkCompiler()
         (compiled_grammar, rule_names) = c.compile_grammar(grammar)
@@ -207,9 +200,10 @@ class NatlinkEngine(EngineBase):
         """ Mimic a recognition of the given *words*. """
         try:
             prepared_words = []
+            encoding = getpreferredencoding()
             for word in words:
                 if isinstance(word, text_type):
-                    word = word.encode("windows-1252")
+                    word = word.encode(encoding)
                 prepared_words.append(word)
         except Exception as e:
             raise MimicFailure("Invalid mimic input %r: %s."
@@ -234,16 +228,27 @@ class NatlinkEngine(EngineBase):
             self.natlink.setMicState(mic_state)
 
     def _get_language(self):
+        # Get a Windows language identifier from Dragon.
         import win32com.client
         app = win32com.client.Dispatch("Dragon.DgnEngineControl")
         language = app.SpeakerLanguage("")
-        try:
-            tag = self._language_tags[language]
-            tag = tag[0]
-        except KeyError:
-            self._log.error("Unknown speaker language: 0x%04x" % language)
-            raise GrammarError("Unknown speaker language: 0x%04x" % language)
-        return tag
+
+        # Lookup the language tags.
+        tags = self._language_tags.get(language)
+        if tags:
+            return tags[0]
+
+        # The _language_tags dictionary didn't contain the language, so
+        # get the best match by using the primary language identifier.
+        # This allows us to match unlisted language variants.
+        primary_id = language & 0x00ff
+        for lang_id, (tag, _) in self._language_tags.items():
+            if primary_id == lang_id & 0x00ff:  # Match found.
+                return tag
+
+        # Speaker language wasn't found.
+        self._log.error("Unknown speaker language: 0x%04x" % language)
+        raise GrammarError("Unknown speaker language: 0x%04x" % language)
 
     _language_tags = {
                       0x0c09: ("en", "AustralianEnglish"),
@@ -261,6 +266,7 @@ class NatlinkEngine(EngineBase):
                       0x040a: ("es", "Spanish"),
                       0x0809: ("en", "UKEnglish"),
                       0x0409: ("en", "USEnglish"),
+                      0xf809: ("en", "CAEnglish"),
                      }
 
 #---------------------------------------------------------------------------
@@ -313,7 +319,7 @@ class GrammarWrapper(object):
         #  method for processing the recognition and return.
         s = state_.State(words_rules, self.grammar._rule_names, self.engine)
         for r in self.grammar._rules:
-            if not r.active: continue
+            if not (r.active and r.exported): continue
             s.initialize_decoding()
             for result in r.decode(s):
                 if s.finished():

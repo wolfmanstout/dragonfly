@@ -31,8 +31,7 @@ import win32gui
 import win32con
 
 from .base_window    import BaseWindow
-from .rectangle      import Rectangle, unit
-from .monitor        import monitors
+from .rectangle      import Rectangle
 from ..actions.action_key import Key
 
 
@@ -59,13 +58,19 @@ class Win32Window(BaseWindow):
     @classmethod
     def get_all_windows(cls):
         def function(handle, argument):
-            argument.append(Win32Window(handle))
+            argument.append(cls.get_window(handle))
         argument = []
         win32gui.EnumWindows(function, argument)
         return argument
 
     @classmethod
     def get_matching_windows(cls, executable=None, title=None):
+        # Make window searches case-insensitive.
+        if executable:
+            executable = executable.lower()
+        if title:
+            title = title.lower()
+
         matching = []
         for window in cls.get_all_windows():
             if not window.is_visible:
@@ -105,7 +110,7 @@ class Win32Window(BaseWindow):
     def __init__(self, handle):
         super(Win32Window, self).__init__(id=handle)
 
-    def __str__(self):
+    def __repr__(self):
         args = ["handle=%d" % self.handle] + list(self._names)
         return "%s(%s)" % (self.__class__.__name__, ", ".join(args))
 
@@ -133,7 +138,12 @@ class Win32Window(BaseWindow):
     is_enabled      = _win32gui_test("IsWindowEnabled")
     is_visible      = _win32gui_test("IsWindowVisible")
     is_minimized    = _win32gui_test("IsIconic")
-#   is_maximized    = _win32gui_test("IsZoomed")  # IsZoomed is unavailable
+
+    @property
+    def is_maximized(self):
+        # IsZoomed() is not available from win32gui for some reason.
+        # So we use the function directly.
+        return bool(windll.user32.IsZoomed(self._handle))
 
     def _win32gui_show_window(state):
         return lambda self: win32gui.ShowWindow(self._handle, state)
@@ -197,25 +207,6 @@ class Win32Window(BaseWindow):
         assert isinstance(rectangle, Rectangle)
         l, t, w, h = rectangle.ltwh
         win32gui.MoveWindow(self._handle, l, t, w, h, 1)
-
-    def get_containing_monitor(self):
-        center = self.get_position().center
-        for monitor in monitors:
-            if monitor.rectangle.contains(center):
-                return monitor
-        # Fall through, return first monitor.
-        return monitors[0]
-
-    def get_normalized_position(self):
-        monitor = self.get_containing_monitor()
-        rectangle = self.get_position()
-        rectangle.renormalize(monitor.rectangle, unit)
-        return rectangle
-
-    def set_normalized_position(self, rectangle, monitor=None):
-        if not monitor: monitor = self.get_containing_monitor()
-        rectangle.renormalize(unit, monitor.rectangle)
-        self.set_position(rectangle)
 
     #-----------------------------------------------------------------------
     # Methods for miscellaneous window control.

@@ -23,11 +23,12 @@ Engine class for CMU Pocket Sphinx
 """
 
 import contextlib
+import locale
 import logging
 import os
 import wave
 
-from six import text_type, PY2
+from six import binary_type, text_type, string_types, PY2
 
 from dragonfly import Window
 from .recobs import SphinxRecObsManager
@@ -55,6 +56,18 @@ except ImportError:
 
 class UnknownWordError(Exception):
     pass
+
+
+def _map_to_str(text, encoding=locale.getpreferredencoding()):
+    # Translate unicode/bytes to whatever str is in this version of
+    # Python. Decoder methods seem to require str objects.
+    if not isinstance(text, string_types):
+        text = str(text)
+    if PY2 and isinstance(text, text_type):
+        text = text.encode(encoding)
+    elif not PY2 and isinstance(text, binary_type):
+        text = text.decode(encoding)
+    return text
 
 
 class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
@@ -90,6 +103,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         self._keyphrase_functions = {}
         self._training_session_active = False
         self._default_search_result = None
+        self._grammar_count = 0
 
         # Timer-related members.
         self._timer_manager = SphinxTimerManager(0.02, self)
@@ -256,6 +270,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         self._cancel_recognition_next_time = False
         self._training_session_active = False
         self._recognition_paused = False
+        self._grammar_count = 0
 
         # Clear dictionaries and sets
         self._grammar_wrappers.clear()
@@ -310,6 +325,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         if not self._decoder:
             self.connect()
 
+        word = _map_to_str(word)
         return bool(self._decoder.lookup_word(word.lower()))
 
     def _validate_words(self, words, search_type):
@@ -329,8 +345,11 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
             )
 
     def _build_grammar_wrapper(self, grammar):
+        search_name = "%d" % self._grammar_count
+        self._grammar_count += 1
         return GrammarWrapper(grammar, self,
-                              self._recognition_observer_manager)
+                              self._recognition_observer_manager,
+                              search_name)
 
     def _set_grammar(self, wrapper, activate, partial=False):
         if not wrapper:
@@ -368,7 +387,8 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
 
         # Set the JSGF search.
         self._decoder.end_utterance()
-        self._decoder.set_jsgf_string(wrapper.search_name, compiled)
+        self._decoder.set_jsgf_string(wrapper.search_name,
+                                      _map_to_str(compiled))
         activate_search_if_necessary()
 
         # Grammar search has been loaded, so set the wrapper's flag.
@@ -384,10 +404,8 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
 
         # Unset the Pocket Sphinx search.
         if name in self._valid_searches:
-            # Unfortunately, the C function for doing this (ps_unset_search)
-            # is not exposed. Pocket Sphinx searches are pretty lighweight
-            # however. This would only be an issue on hardware with limited
-            # memory.
+            # Unset the decoder search.
+            self._decoder.unset_search(name)
 
             # Remove the search from the valid searches set.
             self._valid_searches.remove(name)
@@ -463,24 +481,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         """ Load the given *grammar* and return a wrapper. """
         self._log.debug("Engine %s: loading grammar %s."
                         % (self, grammar.name))
-
-        grammar.engine = self
-        # Dependency checking.
-        memo = []
-        for r in grammar.rules:
-            for d in r.dependencies(memo):
-                grammar.add_dependency(d)
-
         wrapper = self._build_grammar_wrapper(grammar)
-
-        # Check that the engine doesn't already have a grammar with the same
-        # search name. This will include grammars with the same reference
-        # name, e.g. "some grammar" and "some_grammar".
-        if wrapper.search_name in self._valid_searches:
-            message = "Failed to load grammar %s: multiple grammars with " \
-                "the same name are not allowed" % grammar
-            self._log.error(message)
-            raise EngineError(message)
 
         # Attempt to set the grammar search.
         try:
@@ -629,7 +630,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         # each literal in the _temp grammar came from a Pocket Sphinx
         # hypothesis.
         self._decoder.end_utterance()
-        self._decoder.set_jsgf_string(name, compiled)
+        self._decoder.set_jsgf_string(name, _map_to_str(compiled))
         self._decoder.active_search = name
 
         # Do the processing.
@@ -642,6 +643,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         # Switch back to the previous search.
         self._decoder.end_utterance()  # just in case
         self._decoder.active_search = original
+        self._decoder.unset_search("_temp")
         return result
 
     def _speech_start_callback(self, mimicking):
@@ -778,8 +780,8 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         # Minor note: this won't work for languages without capitalisation.
         result = []
         for word in words.split():
-            if PY2 and isinstance(word, str):
-                word = text_type(word, encoding="utf-8")
+            if isinstance(word, binary_type):
+                word = word.decode(locale.getpreferredencoding())
             if word.isupper() and mimicking:
                 # Convert dictation words to lowercase for consistent
                 # output.

@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -22,7 +22,7 @@
 CompoundRule class
 ============================================================================
 
-The CompoundRule class is designed to make it very easy to create a rule 
+The CompoundRule class is designed to make it very easy to create a rule
 based on a single compound spec.
 
 This rule class has the following parameters to customize its behavior:
@@ -33,7 +33,7 @@ This rule class has the following parameters to customize its behavior:
  - *exported* -- whether the rule is exported
  - *context* -- context in which the rule will be active
 
-Each of these parameters can be passed as a (keyword) arguments to the 
+Each of these parameters can be passed as a (keyword) arguments to the
 constructor, or defined as a class attribute in a derived class.
 
 
@@ -92,8 +92,8 @@ class CompoundRule(Rule):
     spec     = None
     extras   = ()
     defaults = ()
-    exported = True
     context  = None
+    _default_exported = True
 
     #-----------------------------------------------------------------------
 
@@ -103,8 +103,17 @@ class CompoundRule(Rule):
         if spec     is None: spec     = self.spec
         if extras   is None: extras   = self.extras
         if defaults is None: defaults = self.defaults
-        if exported is None: exported = self.exported
         if context  is None: context  = self.context
+
+        # Complex handling of exported, because of clashing use of the
+        #  exported name at the class level: property & class-value.
+        if exported is not None:
+            pass
+        elif (hasattr(self.__class__, "exported")
+            and not isinstance(self.__class__.exported, property)):
+            exported = self.__class__.exported
+        else:
+            exported = self._default_exported
 
         assert isinstance(name, string_types)
         assert isinstance(spec, string_types)

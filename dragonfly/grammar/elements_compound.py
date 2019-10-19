@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -27,9 +27,10 @@ creating grammar element structures based on a simple text format.
 
 """
 
-
+import locale
 import re
-from six import string_types
+
+from six import string_types, binary_type
 
 import dragonfly.grammar.elements_basic as elements_
 import dragonfly.parser as parser_
@@ -238,6 +239,9 @@ class Compound(elements_.Alternative):
 
     def __init__(self, spec, extras=None, actions=None, name=None,
                  value=None, value_func=None, elements=None, default=None):
+        if isinstance(spec, binary_type):
+            spec = spec.decode(locale.getpreferredencoding())
+
         self._spec = spec
         self._value = value
         self._value_func = value_func
@@ -284,7 +288,7 @@ class Compound(elements_.Alternative):
         elements_.Alternative.__init__(self, (element,), name=name,
                                        default=default)
 
-    def __str__(self):
+    def __repr__(self):
         arguments = ["%r" % self._spec]
         if self.name:
             arguments.append("name=%r" % self.name)

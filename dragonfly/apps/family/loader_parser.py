@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -36,10 +36,7 @@ from ...parser import (Parser, ParserElementBase,
 class Identifier(object):
 
     def __init__(self, name):
-        self.name = name    
-
-    def __str__(self):
-        return "Identifier(%r)" % self.name
+        self.name = name
 
     def __repr__(self):
         return "Identifier(%r)" % self.name
@@ -57,10 +54,10 @@ class Identifier(object):
 class Argument(object):
 
     def __init__(self, name=None, value=None):
-        self.name = name    
+        self.name = name
         self.value = value
 
-    def __str__(self):
+    def __repr__(self):
         return "Argument(%r, %r)" % (self.name, self.value)
 
     def __ne__(self, other):
@@ -79,12 +76,9 @@ class Call(object):
         self.function = function
         self.arguments = arguments
 
-    def __str__(self):
+    def __repr__(self):
         args = [str(a) for a in self.arguments]
         return "Call(f=%r, args=(%s))" % (self.function, ", ".join(args))
-
-    def __repr__(self):
-        return self.__str__()
 
     def __ne__(self, other):
         return not (self == other)

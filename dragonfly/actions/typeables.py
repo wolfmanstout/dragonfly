@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -29,12 +29,7 @@
 
 """
 
-import logging
-
 from .keyboard import keyboard, Typeable, KeySymbols
-
-
-_log = logging.getLogger("typeables")
 
 
 # --------------------------------------------------------------------------
@@ -46,11 +41,13 @@ key_symbols = KeySymbols()
 
 def _add_typeable(name, char):
     # Add a character to the typeables dictionary if it is typeable with
-    # the current keyboard layout or log an error if it isn't.
+    # the current keyboard layout.
     try:
         typeables[name] = keyboard.get_typeable(char)
     except ValueError as e:
-        _log.error(e)
+        # Errors or log messages will occur later if code attempts to use
+        # missing typeables.
+        pass
 
 
 # Lowercase letter keys

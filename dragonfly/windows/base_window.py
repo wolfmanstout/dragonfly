@@ -24,9 +24,12 @@ Base Window class
 
 """
 
-from six import string_types, integer_types, binary_type
 from locale import getpreferredencoding
 
+from six import string_types, integer_types, binary_type
+
+from .monitor import monitors
+from .rectangle import unit
 from .window_movers import window_movers
 
 #===========================================================================
@@ -71,6 +74,8 @@ class BaseWindow(object):
         """
         Find windows with a matching executable or title.
 
+        Window searches are case-insensitive.
+
         If neither parameter is be specified, then it is effectively the
         same as calling :meth:`get_all_windows`.
 
@@ -83,6 +88,12 @@ class BaseWindow(object):
         :type title: str
         :rtype: list
         """
+        # Make window searches case-insensitive.
+        if executable:
+            executable = executable.lower()
+        if title:
+            title = title.lower()
+
         matching = []
         for window in cls.get_all_windows():
             if executable:
@@ -107,7 +118,7 @@ class BaseWindow(object):
         self.id = id
         self._names = set()
 
-    def __str__(self):
+    def __repr__(self):
         args = list(self._names)
         return "%s(%s)" % (self.__class__.__name__, ", ".join(args))
 
@@ -231,6 +242,53 @@ class BaseWindow(object):
         :type rectangle: Rectangle
         """
         raise NotImplementedError()
+
+    def get_containing_monitor(self):
+        """
+        Method to get the :class:`Monitor` containing the window.
+
+        This checks which monitor contains the center of the window.
+
+        :returns: containing monitor
+        :rtype: Monitor
+        """
+        center = self.get_position().center
+        for monitor in monitors:
+            if monitor.rectangle.contains(center):
+                return monitor
+        # Fall through, return first monitor.
+        return monitors[0]
+
+    def get_normalized_position(self):
+        """
+        Method to get the window's normalized position.
+
+        This is useful when working with multiple monitors.
+
+        :returns: normalized position
+        :rtype: Rectangle
+        """
+        monitor = self.get_containing_monitor()
+        rectangle = self.get_position()
+        rectangle.renormalize(monitor.rectangle, unit)
+        return rectangle
+
+    def set_normalized_position(self, rectangle, monitor=None):
+        """
+        Method to get the window's normalized position.
+
+        This is useful when working with multiple monitors.
+
+        :param rectangle: window position
+        :type rectangle: Rectangle
+        :param monitor: monitor to normalize to (default: the first one).
+        :type monitor: Monitor
+        """
+        if not monitor:
+            monitor = self.get_containing_monitor()
+
+        rectangle.renormalize(unit, monitor.rectangle)
+        self.set_position(rectangle)
 
     #-----------------------------------------------------------------------
     # Methods for miscellaneous window control.

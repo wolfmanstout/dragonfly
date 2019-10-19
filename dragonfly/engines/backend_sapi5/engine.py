@@ -134,14 +134,6 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
         if not self._recognizer:
             self.connect()
 
-        grammar.engine = self
-
-        # Dependency checking.
-        memo = []
-        for r in grammar._rules:
-            for d in r.dependencies(memo):
-                grammar.add_dependency(d)
-
         # Create recognition context, compile grammar, and create
         #  the grammar wrapper object for managing this grammar.
         context = self._recognizer.CreateRecoContext()
@@ -609,7 +601,7 @@ class GrammarWrapper(object):
 
             s = State(results, rule_set, self.engine)
             for r in self.grammar.rules:
-                if not r.active:
+                if not (r.active and r.exported):
                     continue
 
                 s.initialize_decoding()

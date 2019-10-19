@@ -3,18 +3,18 @@
 # (c) Copyright 2007, 2008 by Christo Butcher
 # Licensed under the LGPL.
 #
-#   Dragonfly is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU Lesser General Public License as published 
-#   by the Free Software Foundation, either version 3 of the License, or 
+#   Dragonfly is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Lesser General Public License as published
+#   by the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
 #
-#   Dragonfly is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of 
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+#   Dragonfly is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 #   Lesser General Public License for more details.
 #
-#   You should have received a copy of the GNU Lesser General Public 
-#   License along with Dragonfly.  If not, see 
+#   You should have received a copy of the GNU Lesser General Public
+#   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
 
@@ -24,8 +24,10 @@
 """
 
 
+from locale import getpreferredencoding
 import logging
-from six import text_type, PY2
+
+from six import PY2, text_type, binary_type
 
 from ..error import GrammarError
 
@@ -48,9 +50,9 @@ class State(object):
         self.initialize_decoding()
         self._previous_index = None
 
-    def __str__(self):
+    def __repr__(self):
         if PY2:
-            return self.__unicode__().encode("windows-1252")
+            return self.__unicode__().encode(getpreferredencoding())
         else:
             return self.__unicode__()
 
@@ -172,21 +174,19 @@ class State(object):
         return None
 
     def _log_step(self, parser, message):
-        if not self._log_decode:
+        if not self._log_decode or not self._log_decode.isEnabledFor(logging.DEBUG):
             return
         indent = u"   " * self._depth
         output = u"%s%s: %s" % (indent, message, parser)
-        if PY2:
-            self._log_decode.debug(output.encode("utf-8"))
-        else:
-            self._log_decode.debug(output)
+        if isinstance(output, binary_type):
+            output = output.decode(getpreferredencoding())
+        self._log_decode.debug(output)
         if self._index != self._previous_index:
             self._previous_index = self._index
             output = u"%s -- Decoding State: '%s'" % (indent, text_type(self))
-            if PY2:
-                self._log_decode.debug(output.encode("utf-8"))
-            else:
-                self._log_decode.debug(output)
+            if isinstance(output, binary_type):
+                output = output.decode(getpreferredencoding())
+            self._log_decode.debug(output)
 
     # -----------------------------------------------------------------------
     # Methods for evaluation.
@@ -226,7 +226,7 @@ class Node(object):
         self.engine = engine
         self.children = []
 
-    def __str__(self):
+    def __repr__(self):
         return "Node: %s, %s" % (self.actor, self.words())
 
     def words(self):
