@@ -82,12 +82,9 @@ def test_with_engine(args):
         except KeyboardInterrupt:
             pass
 
-    # Unload all grammars (required if using natlink remotely).
-    for grammar in engine.grammars:
-        grammar.unload()
-
-    # Disconnect the engine.
-    engine.disconnect()
+        # Unload all grammars (required if using natlink remotely).
+        for grammar in engine.grammars:
+            grammar.unload()
 
     # Return the success of this command.
     return return_code
@@ -114,7 +111,7 @@ def make_arg_parser():
         "engine.mimic() after command modules are loaded."
     )
     parser_test.add_argument(
-        "files", metavar="file", nargs="+", type=argparse.FileType("r"),
+        "files", metavar="file", nargs="*", type=argparse.FileType("r"),
         help="Command module file(s)."
     )
     parser_test.add_argument(

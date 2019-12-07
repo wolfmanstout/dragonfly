@@ -28,8 +28,13 @@ Detecting sleep mode
  - http://blogs.msdn.com/b/tsfaware/archive/2010/03/22/detecting-sleep-mode-in-sapi.aspx
 
 """
+
+import os.path
+import sys
+import pywintypes
+from datetime import datetime
 from locale import getpreferredencoding
-from six import text_type, binary_type
+from six import text_type, binary_type, string_types
 
 from ..base        import EngineBase, EngineError, MimicFailure
 from ...error import GrammarError
@@ -64,7 +69,7 @@ class NatlinkEngine(EngineBase):
 
     #-----------------------------------------------------------------------
 
-    def __init__(self):
+    def __init__(self, retain_dir=None):
         EngineBase.__init__(self)
 
         self.natlink = None
@@ -78,6 +83,12 @@ class NatlinkEngine(EngineBase):
         self._grammar_count = 0
         self._recognition_observer_manager = NatlinkRecObsManager(self)
         self._timer_manager = NatlinkTimerManager(0.02, self)
+        self._retain_dir = None
+        try:
+            self.set_retain_directory(retain_dir)
+        except EngineError as err:
+            self._retain_dir = None
+            self._log.error(err)
 
     def connect(self):
         """ Connect to natlink with Python threading support enabled. """
@@ -85,6 +96,23 @@ class NatlinkEngine(EngineBase):
 
     def disconnect(self):
         """ Disconnect from natlink. """
+        # Unload all grammars from the engine so that Dragon doesn't keep
+        # recognizing them.
+        for grammar in self.grammars:
+            grammar.unload()
+
+        # Close the the waitForSpeech() dialog box if it is active.
+        from dragonfly import Window
+        target_title = "Natlink / Python Subsystem"
+        for window in Window.get_matching_windows(title=target_title):
+            if window.is_visible:
+                try:
+                    window.close()
+                except pywintypes.error:
+                    pass
+                break
+
+        # Finally disconnect from natlink.
         self.natlink.natDisconnect()
 
     # -----------------------------------------------------------------------
@@ -196,8 +224,14 @@ class NatlinkEngine(EngineBase):
     #-----------------------------------------------------------------------
     # Miscellaneous methods.
 
+    def _do_recognition(self):
+        self.natlink.waitForSpeech()
+
     def mimic(self, words):
         """ Mimic a recognition of the given *words*. """
+        if isinstance(words, string_types):
+            words = words.split()
+
         try:
             prepared_words = []
             encoding = getpreferredencoding()
@@ -269,6 +303,47 @@ class NatlinkEngine(EngineBase):
                       0xf809: ("en", "CAEnglish"),
                      }
 
+    def set_retain_directory(self, retain_dir):
+        """
+        Set the directory where audio data is saved.
+
+        Retaining audio data may be useful for acoustic model training. This
+        is disabled by default.
+
+        If a relative path is used and the code is running via natspeak.exe,
+        then the path will be made relative to the Natlink user directory or
+        base directory (e.g. ``MacroSystem``).
+
+        :param retain_dir: retain directory path
+        :type retain_dir: string|None
+        """
+        is_string = isinstance(retain_dir, string_types)
+        if not (retain_dir is None or is_string):
+            raise EngineError("Invalid retain_dir: %r" % retain_dir)
+
+        if is_string:
+            # Handle relative paths by using the Natlink user directory or
+            # base directory. Only do this if running via natspeak.exe.
+            try:
+                import natlinkstatus
+            except ImportError:
+                natlinkstatus = None
+            running_via_natspeak = (
+                sys.executable.endswith("natspeak.exe") and
+                natlinkstatus is not None
+            )
+            if not os.path.isabs(retain_dir) and running_via_natspeak:
+                status = natlinkstatus.NatlinkStatus()
+                user_dir = status.getUserDirectory()
+                retain_dir = os.path.join(
+                    # Use the base dir if user dir isn't set.
+                    user_dir if user_dir else status.BaseDirectory,
+                    retain_dir
+                )
+
+        # Set the retain directory.
+        self._retain_dir = retain_dir
+
 #---------------------------------------------------------------------------
 
 
@@ -323,6 +398,7 @@ class GrammarWrapper(object):
             s.initialize_decoding()
             for result in r.decode(s):
                 if s.finished():
+                    self._retain_audio(words, results, r.name)
                     root = s.build_parse_tree()
                     r.process_recognition(root)
                     return
@@ -330,3 +406,36 @@ class GrammarWrapper(object):
         NatlinkEngine._log.warning("Grammar %s: failed to decode"
                                    " recognition %r."
                                    % (self.grammar._name, words))
+
+    def _retain_audio(self, words, results, rule_name):
+        # Only write audio data and metadata if the directory exists.
+        retain_dir = self.engine._retain_dir
+        if retain_dir and not os.path.isdir(retain_dir):
+            self.engine._log.warning(
+                "Audio was not retained because '%s' was not a "
+                "directory" % retain_dir
+            )
+        elif retain_dir:
+            try:
+                audio = results.getWave()
+                # Make sure we have audio data
+                if len(audio) > 0:
+                    # Write audio data.
+                    now = datetime.now()
+                    filename = ("retain_%s.wav"
+                                % now.strftime("%Y-%m-%d_%H-%M-%S_%f"))
+                    wav_path = os.path.join(retain_dir, filename)
+                    with open(wav_path, "wb") as f:
+                        f.write(audio)
+
+                    # Write metadata
+                    text = ' '.join(words)
+                    audio_length = float(len(audio) / 2) / 11025  # assumes 11025Hz 16bit mono
+                    tsv_path = os.path.join(retain_dir, "retain.tsv")
+                    with open(tsv_path, "a") as tsv_file:
+                        tsv_file.write('\t'.join([
+                            filename, text_type(audio_length),
+                            self.grammar.name, rule_name, text
+                        ]) + '\n')
+            except:
+                self.engine._log.exception("Exception retaining audio")

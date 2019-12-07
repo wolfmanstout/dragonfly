@@ -20,7 +20,7 @@
 
 import os.path
 import re
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Command
 
 
 #---------------------------------------------------------------------------
@@ -32,6 +32,36 @@ version_string = open(path).readline()
 match = re.match(r"\s*(?P<rel>(?P<ver>\d+\.\d+)(?:\.\S+)*)\s*", version_string)
 version = match.group("ver")
 release = match.group("rel")
+
+#---------------------------------------------------------------------------
+# Override the 'test' command to use pytest instead.
+# Test requirements are located in the 'test_requirements.txt' file.
+
+class test(Command):
+    description = 'run unit tests and doctests after in-place build'
+    user_options = [
+        # (long option, short option, description)
+        # '=' means an argument should be supplied.
+        ('test-suite=', None, 'Dragonfly engine to test (default: "text")'),
+    ]
+
+    def initialize_options(self):
+        self.test_suite = 'text'
+
+    def finalize_options(self):
+        # Check that 'test_suite' is an engine name.
+        from dragonfly.test.suites import engine_tests_dict
+        suite = self.test_suite
+        assert suite in engine_tests_dict.keys(), \
+            "the test suite value must be an engine name, not '%s'" % suite
+
+    def run(self):
+        from dragonfly.test.suites import run_pytest_suite
+        print("Test suite running for engine '%s'" % self.test_suite)
+        result = run_pytest_suite(self.test_suite)
+
+        # Exit using pytest's return code.
+        exit(int(result))
 
 
 #---------------------------------------------------------------------------
@@ -53,11 +83,7 @@ setup(
       url              = "https://github.com/dictation-toolbox/dragonfly",
       zip_safe         = False,  # To unzip documentation files.
       long_description = read("README.rst"),
-
-      package_data={
-                    "": ["*.txt", "*.rst"]
-                   },
-
+      include_package_data=True,
       install_requires=[
                         "setuptools >= 0.6c7",
                         "six",
@@ -65,6 +91,7 @@ setup(
                         "enum34;python_version<'3.4'",
                         "regex",
                         "decorator",
+                        "lark-parser",
 
                         # Windows-only dependencies.
                         "comtypes;platform_system=='Windows'",
@@ -105,13 +132,27 @@ setup(
                     ],
       },
 
+      cmdclass={
+          "test": test,
+      },
+
       classifiers=[
-                   "Environment :: Win32 (MS Windows)",
                    "Development Status :: 4 - Beta",
+                   "Environment :: Win32 (MS Windows)",
+                   "Environment :: X11 Applications",
                    "License :: OSI Approved :: "
                    "GNU Library or Lesser General Public License (LGPL)",
+                   "Intended Audience :: Developers",
                    "Operating System :: Microsoft :: Windows",
-                   "Programming Language :: Python",
+                   "Operating System :: POSIX",
+                   "Programming Language :: Python :: 2.7",
+                   "Programming Language :: Python :: 3.4",
+                   "Programming Language :: Python :: 3.5",
+                   "Programming Language :: Python :: 3.6",
+                   "Programming Language :: Python :: 3.7",
+                   "Programming Language :: Python :: Implementation :: CPython",
+                   "Topic :: Multimedia :: Sound/Audio :: Speech",
+                   "Topic :: Software Development :: Libraries :: Python Modules",
                   ],
 
       packages=find_packages(),

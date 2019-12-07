@@ -24,7 +24,6 @@ Window class for Windows
 
 """
 
-import os
 from ctypes          import windll, pointer, c_wchar, c_ulong
 
 import win32gui
@@ -43,6 +42,8 @@ class Win32Window(BaseWindow):
         and placement.
 
     """
+
+    _results_box_class_names = ["#32770", "DgnResultsBoxWindow"]
 
     #-----------------------------------------------------------------------
     # Class methods to create new Window objects.
@@ -75,9 +76,16 @@ class Win32Window(BaseWindow):
         for window in cls.get_all_windows():
             if not window.is_visible:
                 continue
-            if (os.name == 'nt'
-                    and window.executable.endswith("natspeak.exe")
-                    and window.classname == "#32770"
+
+            if executable:
+                if window.executable.lower().find(executable) == -1:
+                    continue
+            if title:
+                if window.title.lower().find(title) == -1:
+                    continue
+
+            if (window.executable.endswith("natspeak.exe")
+                    and window.classname in cls._results_box_class_names
                     and window.get_position().dy < 50):
                 # If a window matches the above, it is very probably
                 #  the results-box of DNS.  We ignore this because
@@ -86,12 +94,6 @@ class Win32Window(BaseWindow):
                 #  a window with a spoken title.
                 continue
 
-            if executable:
-                if window.executable.lower().find(executable) == -1:
-                    continue
-            if title:
-                if window.title.lower().find(title) == -1:
-                    continue
             matching.append(window)
 
         return matching
@@ -157,10 +159,15 @@ class Win32Window(BaseWindow):
 
     close = _win32gui_post(win32con.WM_CLOSE)
 
-    def _get_window_module(self):
+    def _get_window_pid(self):
         # Get this window's process ID.
         pid = c_ulong()
         windll.user32.GetWindowThreadProcessId(self._handle, pointer(pid))
+        return pid.value
+
+    def _get_window_module(self):
+        # Get this window's process ID.
+        pid = self._get_window_pid()
 
         # Get the process handle of this window's process ID.
         #  Access permission flags:

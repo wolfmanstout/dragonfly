@@ -204,11 +204,12 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
         self._log.debug("Setting exclusiveness of grammar %s to %s."
                         % (grammar.name, exclusive))
         wrapper = self._get_grammar_wrapper(grammar)
-        if exclusive:
+        if exclusive and wrapper.handle.State != constants.SGSExclusive:
             wrapper.state_before_exclusive = wrapper.handle.State
             wrapper.handle.State = constants.SGSExclusive
-        elif wrapper.handle.State == constants.SGSExclusive:
-            assert wrapper.state_before_exclusive in (constants.SGSEnabled, constants.SGSDisabled)
+        elif not exclusive and wrapper.handle.State == constants.SGSExclusive:
+            assert wrapper.state_before_exclusive in (constants.SGSEnabled,
+                                                      constants.SGSDisabled)
             wrapper.handle.State = wrapper.state_before_exclusive
         # grammar_handle.SetGrammarState(constants.SPGS_EXCLUSIVE)
 
@@ -305,7 +306,7 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
             grammar.process_begin(window.executable, window.title,
                                   window.handle)
 
-    def recognize_forever(self):
+    def _do_recognition(self):
         """
             Recognize speech in a loop.
 
@@ -345,9 +346,9 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
           win32con.EVENT_OBJECT_NAMECHANGE, }]
 
         # Recognize speech, call timer functions and handle window change
-        # events in a loop.
+        # events in a loop. Stop on disconnect().
         self.speak('beginning loop!')
-        while 1:
+        while self._recognizer is not None:
             pythoncom.PumpWaitingMessages()
             self.call_timer_callback()
             time.sleep(0.005)

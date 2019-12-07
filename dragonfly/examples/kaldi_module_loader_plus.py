@@ -17,7 +17,7 @@ from __future__ import print_function
 import os.path
 import logging
 
-from dragonfly import RecognitionObserver, get_engine
+from dragonfly import get_engine
 from dragonfly import Grammar, MappingRule, Function, Dictation, FuncContext
 from dragonfly.loader import CommandModuleDirectory
 from dragonfly.log import setup_log
@@ -97,20 +97,6 @@ def load_sleep_wake_grammar(initial_awake):
 
 
 # --------------------------------------------------------------------------
-# Simple recognition observer class.
-
-class Observer(RecognitionObserver):
-    def on_begin(self):
-        print("Speech started.")
-
-    def on_recognition(self, words):
-        print("Recognized:", " ".join(words))
-
-    def on_failure(self):
-        print("Sorry, what was that?")
-
-
-# --------------------------------------------------------------------------
 # Main event driving loop.
 
 def main():
@@ -137,26 +123,33 @@ def main():
         # auto_add_to_user_lexicon=True,  # set to True to possibly use cloud for pronunciations
         # lazy_compilation=True,  # set to True to parallelize & speed up loading
         # cloud_dictation=None,  # set to 'gcloud' to use cloud dictation
+        # retain_dir=None,  # set to a writable directory path to retain recognition metadata and/or audio data
+        # retain_audio=None,  # set to True to retain speech data wave files in the retain_dir (if set)
     )
 
     # Call connect() now that the engine configuration is set.
     engine.connect()
 
-    # Register a recognition observer
-    observer = Observer()
-    observer.register()
-
+    # Load grammars.
     load_sleep_wake_grammar(True)
-
     directory = CommandModuleDirectory(path, excludes=[__file__])
     directory.load()
+
+    # Define recognition callback functions.
+    def on_begin():
+        print("Speech start detected.")
+
+    def on_recognition(words):
+        print("Recognized: %s" % " ".join(words))
+
+    def on_failure():
+        print("Sorry, what was that?")
 
     # Start the engine's main recognition loop
     engine.prepare_for_recognition()
     try:
-        # Loop forever
         print("Listening...")
-        engine.do_recognition()
+        engine.do_recognition(on_begin, on_recognition, on_failure)
     except KeyboardInterrupt:
         pass
 
