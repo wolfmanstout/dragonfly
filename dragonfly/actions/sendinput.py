@@ -25,6 +25,8 @@ This file implements an interface to the Win32 SendInput function
 for simulating keyboard and mouse events.
 """
 
+# pylint: disable=E0401
+# This file imports Win32-only symbols.
 
 from ctypes import (c_short, c_long, c_ushort, c_ulong, sizeof,
                     POINTER, pointer, Structure, Union, windll)
@@ -53,7 +55,10 @@ class KeyboardInput(Structure):
                 ("dwFlags", c_ulong),
                 ("time", c_ulong),
                 ("dwExtraInfo", POINTER(c_ulong))]
-    soft_keys = tuple(SOFT_KEYS)
+    soft_keys = set(SOFT_KEYS)
+
+    # pylint: disable=line-too-long
+
     #  From https://docs.microsoft.com/en-us/windows/desktop/inputdev/about-keyboard-input#extended-key-flag
     #     The extended keys consist of the ALT and CTRL keys
     #     on the right-hand side of the keyboard; the INS, DEL, HOME,
@@ -64,26 +69,26 @@ class KeyboardInput(Structure):
     #
     #  It's unclear if the Windows keys are also "extended", so they
     #  have been included for historical reasons.
-    extended_keys = (
-                     win32con.VK_UP,
-                     win32con.VK_DOWN,
-                     win32con.VK_LEFT,
-                     win32con.VK_RIGHT,
-                     win32con.VK_HOME,
-                     win32con.VK_END,
-                     win32con.VK_PRIOR,
-                     win32con.VK_NEXT,
-                     win32con.VK_INSERT,
-                     win32con.VK_DELETE,
-                     win32con.VK_NUMLOCK,
-                     win32con.VK_RCONTROL,
-                     win32con.VK_RMENU,
-                     win32con.VK_PAUSE,
-                     win32con.VK_SNAPSHOT,
-                     win32con.VK_DIVIDE,
-                     win32con.VK_LWIN,
-                     win32con.VK_RWIN,
-                    )
+    extended_keys = set((
+        win32con.VK_UP,
+        win32con.VK_DOWN,
+        win32con.VK_LEFT,
+        win32con.VK_RIGHT,
+        win32con.VK_HOME,
+        win32con.VK_END,
+        win32con.VK_PRIOR,
+        win32con.VK_NEXT,
+        win32con.VK_INSERT,
+        win32con.VK_DELETE,
+        win32con.VK_NUMLOCK,
+        win32con.VK_RCONTROL,
+        win32con.VK_RMENU,
+        win32con.VK_PAUSE,
+        win32con.VK_SNAPSHOT,
+        win32con.VK_DIVIDE,
+        win32con.VK_LWIN,
+        win32con.VK_RWIN,
+    ))
 
     def __init__(self, virtual_keycode, down, scancode=-1, layout=None):
         """Initialize structure based on key type."""
@@ -98,12 +103,14 @@ class KeyboardInput(Structure):
         flags = 0
         if virtual_keycode == 0:
             flags |= 4  # KEYEVENTF_UNICODE
-        elif virtual_keycode not in self.soft_keys:
-            flags |= 8  # KEYEVENTF_SCANCODE
+        else:
+            if virtual_keycode not in self.soft_keys:
+                flags |= 8  # KEYEVENTF_SCANCODE
+            if virtual_keycode in self.extended_keys:
+                flags |= win32con.KEYEVENTF_EXTENDEDKEY
         if not down:
             flags |= win32con.KEYEVENTF_KEYUP
-        if virtual_keycode in self.extended_keys:
-            flags |= win32con.KEYEVENTF_EXTENDEDKEY
+        
 
         extra = pointer(c_ulong(0))
         # print(virtual_keycode, scancode, flags, 0, extra)

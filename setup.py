@@ -85,7 +85,7 @@ setup(
       long_description = read("README.rst"),
       include_package_data=True,
       install_requires=[
-                        "setuptools >= 0.6c7",
+                        "setuptools >= 40.0.0",
                         "six",
                         "pyperclip >= 1.7.0",
                         "enum34;python_version<'3.4'",
@@ -106,6 +106,8 @@ setup(
                         # Mac OS dependencies.
                         "pynput >= 1.4.2;platform_system=='Darwin'",
                         "pyobjc >= 5.2;platform_system=='Darwin'",
+                        "py-applescript == 1.0.0;platform_system=='Darwin'",
+                        "psutil >= 5.5.1;platform_system=='Darwin'",
 
                         # RPC requirements
                         "json-rpc",

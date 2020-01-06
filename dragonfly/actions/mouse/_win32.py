@@ -18,9 +18,12 @@
 #   <http://www.gnu.org/licenses/>.
 #
 
-import win32con
+# pylint: disable=E0401
+# This file imports Win32-only symbols.
 
 from ctypes import windll, pointer, c_long, c_ulong, Structure
+
+import win32con
 
 from dragonfly.actions.sendinput import (MouseInput, make_input_array,
                                          send_input_array)
@@ -32,9 +35,9 @@ from ._base import BaseButtonEvent, MoveEvent
 
 class Point(Structure):
     _fields_ = [
-                ('x',  c_long),
-                ('y',  c_long),
-               ]
+        ('x',  c_long),
+        ('y',  c_long),
+    ]
 
 
 def get_cursor_position():
@@ -104,8 +107,18 @@ PLATFORM_WHEEL_FLAGS = {
 class ButtonEvent(BaseButtonEvent):
 
     def execute(self, window):
+        # Ensure that the primary mouse button is the *left* button before
+        # sending events.
+        primary_changed = windll.user32.SwapMouseButton(0)
+
+        # Prepare and send the mouse events.
         zero = pointer(c_ulong(0))
         inputs = [MouseInput(0, 0, flag[1], flag[0], 0, zero)
                   for flag in self._flags]
         array = make_input_array(inputs)
         send_input_array(array)
+
+        # Swap the primary mouse button back if it was previously set to
+        # *right*.
+        if primary_changed:
+            windll.user32.SwapMouseButton(1)

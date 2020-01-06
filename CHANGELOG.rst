@@ -11,18 +11,43 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
-Unreleased_
------------
+0.20.0_ - 2020-01-03
+--------------------
+
+Added
+~~~~~
+* Add DarwinWindow class for macOS using 'py-applescript' (thanks to various
+  Aenea contributors).
+* Add Kaldi engine support for defining your own, external engine to use for
+  dictation elements (thanks `@daanzu`_).
+* Add Kaldi engine support for weights on individual rule elements
+  (thanks `@daanzu`_).
+* Add support for special specifiers in Compound specs
+  (thanks `@daanzu`_).
 
 Changed
 ~~~~~~~
+* Change Kaldi default model directory to 'kaldi_model' (thanks `@daanzu`_).
 * Change dragonfly's CLI test command to accept zero file arguments.
+* Clean up code in grammar, actions and windows sub-packages.
+* Improve overall Kaldi engine recognition accuracy (thanks `@daanzu`_).
+* Make a few minor Windows-related speed optimizations
+  (thanks `@Versatilus`_).
 
 Fixed
 ~~~~~
-* Fix Kaldi ListRef bug not updating list (thanks `@daanzu`_).
+* Add missing DNS parser entry for the special "numeral" word.
+* Fix a Windows bug where the wrong mouse buttons will be pressed if the
+  primary/secondary buttons are inverted.
 * Fix a bug with dragonfly's CLI 'test' command where grammars weren't
   properly unloaded.
+* Fix on_recognition() observer callback for the natlink engine.
+* Fix various Kaldi engine bugs (thanks `@daanzu`_).
+* Fix wsr_module_loader_plus.py for newer Python versions.
+
+Removed
+~~~~~~~
+* Remove basic Kaldi module loader 'kaldi_module_loader.py'.
 
 
 0.19.1_ - 2019-11-28
@@ -692,7 +717,8 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.19.1...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.20.0...HEAD
+.. _0.20.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.19.0...0.20.0
 .. _0.19.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.19.0...0.19.1
 .. _0.19.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.18.0...0.19.0
 .. _0.18.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.17.0...0.18.0

@@ -18,6 +18,9 @@
 #   License along with Dragonfly.  If not, see
 #   <http://www.gnu.org/licenses/>.
 #
+
+# pylint: disable=line-too-long
+
 """
 Text action
 ============================================================================
@@ -156,10 +159,10 @@ class Text(BaseKeyboardAction):
             self.unicode_error_message = unicode_error_message
 
     _specials = {
-                 "\n": typeables["enter"],
-                 "\t": typeables["tab"],
-                }
-
+        "\n": typeables["enter"],
+        "\t": typeables["tab"],
+    }
+    
     def __init__(self, spec=None, static=False, pause=None,
                  autofmt=False, use_hardware=False):
         # Use the default pause time if pause in None.
@@ -169,6 +172,7 @@ class Text(BaseKeyboardAction):
 
         # Set other members and call the super constructor.
         self._autofmt = autofmt
+        self._on_windows = sys.platform.startswith("win")
 
         if isinstance(spec, binary_type):
             spec = spec.decode(getpreferredencoding())
@@ -199,7 +203,7 @@ class Text(BaseKeyboardAction):
                                               % (character, spec))
 
                 # Calculate and add Unicode events only if necessary.
-                if not sys.platform.startswith("win"):
+                if not self._on_windows or self._use_hardware:
                     continue
 
                 try:
@@ -227,7 +231,7 @@ class Text(BaseKeyboardAction):
             # Mimic a word, select and copy it to retrieve capitalization.
             get_engine().mimic("test")
             Key("cs-left, c-c/5").execute()
-            word = Clipboard.get_text()
+            word = Clipboard.get_system_text()
 
             # Inspect formatting of the mimicked word.
             index = word.find("test")
