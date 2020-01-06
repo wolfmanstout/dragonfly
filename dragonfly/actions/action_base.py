@@ -217,7 +217,9 @@ class ActionSeries(ActionBase):
 
     def execute(self, data=None):
         for action in self._actions:
-            action.execute(data)
+            if action.execute(data) is False:
+                return False
+        return True
 
 
 #---------------------------------------------------------------------------
