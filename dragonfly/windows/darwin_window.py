@@ -19,6 +19,18 @@
 #
 # Modified from Aenea's server_osx.py file.
 
+"""
+Window class for macOS
+============================================================================
+
+"""
+
+# pylint: disable=E0401
+# This file imports MacOS-only symbols.
+
+# pylint: disable=W0622
+# Suppress warnings about redefining the built-in 'id' function.
+
 import locale
 import logging
 import psutil
@@ -269,3 +281,8 @@ class DarwinWindow(BaseWindow):
         end tell
         ''' % self._id
         applescript.AppleScript(script).run()
+
+    def set_focus(self):
+        # Setting window focus without raising the window doesn't appear to
+        # be possible in macOS, so fallback on set_foreground().
+        self.set_foreground()
