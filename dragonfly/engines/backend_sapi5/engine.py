@@ -225,6 +225,10 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
         else:
             phrase = " ".join(words)
 
+        # Fail on empty input.
+        if not phrase:
+            raise MimicFailure("Invalid mimic input %r" % phrase)
+
         # Register a recognition observer for checking the success of this
         # mimic.
         observer = MimicObserver()
@@ -281,7 +285,19 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
         self._speaker.Speak(text)
 
     def _get_language(self):
-        return "en"
+        if not self._recognizer:
+            return "en"
+
+        # Get Windows language identifiers for supported languages from the
+        # recognizer's current status information.
+        languages = self._recognizer.Status.SupportedLanguages
+
+        # Lookup and return the language tag for the first supported
+        # language ID.
+        if languages:
+            return self._get_language_tag(languages[0])
+        else:
+            return "en"
 
     def process_grammars_context(self, window=None):
         """
@@ -610,9 +626,10 @@ class GrammarWrapper(object):
                     if s.finished():
                         # Notify recognition observers, then process the
                         # rule.
-                        self.recobs_manager.notify_recognition(words)
                         root = s.build_parse_tree()
+                        self.recobs_manager.notify_recognition(words, r, root)
                         r.process_recognition(root)
+                        self.recobs_manager.notify_post_recognition(words, r, root)
                         return
 
         except Exception as e:

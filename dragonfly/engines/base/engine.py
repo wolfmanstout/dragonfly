@@ -175,8 +175,13 @@ class EngineBase(object):
                                   " engine %s." % self)
 
     def set_exclusiveness(self, grammar, exclusive):
+        """ Set the exclusiveness of a grammar. """
         raise NotImplementedError("Virtual method not implemented for"
                                   " engine %s." % self)
+
+    def set_exclusive(self, grammar, exclusive):
+        """ Alias of :meth:`set_exclusiveness`. """
+        self.set_exclusiveness(grammar, exclusive)
 
     def _get_grammar_wrapper(self, grammar):
         wrapper_key = id(grammar)
@@ -205,7 +210,8 @@ class EngineBase(object):
     #  Miscellaneous methods.
 
     def do_recognition(self, begin_callback=None, recognition_callback=None,
-                       failure_callback=None, *args, **kwargs):
+                       failure_callback=None, end_callback=None,
+                       post_recognition_callback=None, *args, **kwargs):
         """
         Recognize speech in a loop until interrupted or :meth:`disconnect`
         is called.
@@ -224,11 +230,19 @@ class EngineBase(object):
         :param failure_callback: optional function to be called on
             recognition failure.
         :type failure_callback: callable | None
+        :param end_callback: optional function to be called when speech
+            ends, either successfully (after calling the recognition
+            callback) or in failure (after calling the failure callback).
+        :type end_callback: callable | None
+        :param post_recognition_callback: optional function to be called
+            after all rule processing has completed.
+        :type post_recognition_callback: callable | None
         """
         # Import locally to avoid cycles.
         from dragonfly.grammar.recobs_callbacks import (
             register_beginning_callback, register_recognition_callback,
-            register_failure_callback
+            register_failure_callback, register_ending_callback,
+            register_post_recognition_callback
         )
 
         if begin_callback:
@@ -237,6 +251,10 @@ class EngineBase(object):
             register_recognition_callback(recognition_callback)
         if failure_callback:
             register_failure_callback(failure_callback)
+        if end_callback:
+            register_ending_callback(end_callback)
+        if post_recognition_callback:
+            register_post_recognition_callback(post_recognition_callback)
 
         # Call _do_recognition() to start recognizing.
         self._do_recognition(*args, **kwargs)
@@ -272,6 +290,44 @@ class EngineBase(object):
         :rtype: str
         """
         return self._get_language()
+
+    def _get_language_tag(self, language_id):
+        # Get a language tag from the Windows language identifier.
+        tags = self._language_tags.get(language_id)
+        if tags:
+            return tags[0]
+
+        # The _language_tags dictionary didn't contain the language, so
+        # get the best match by using the primary language identifier.
+        # This allows us to match unlisted language variants.
+        primary_id = language_id & 0x00ff
+        for language_id2, (tag, _) in self._language_tags.items():
+            if primary_id == language_id2 & 0x00ff:  # Match found.
+                return tag
+
+        # Speaker language wasn't found.
+        self._log.error("Unknown speaker language: 0x%04x" % language_id)
+        raise EngineError("Unknown speaker language: 0x%04x" % language_id)
+
+    _language_tags = {
+                      0x0c09: ("en", "AustralianEnglish"),
+                      0xf00a: ("es", "CastilianSpanish"),
+                      0xf809: ("en", "CAEnglish"),
+                      0x0004: ("zh", "Chinese"),
+                      0x0413: ("nl", "Dutch"),
+                      0x0009: ("en", "English"),
+                      0x040c: ("fr", "French"),
+                      0x0407: ("de", "German"),
+                      0xf009: ("en", "IndianEnglish"),
+                      0x0410: ("it", "Italian"),
+                      0x0411: ("jp", "Japanese"),
+                      0xf40a: ("es", "LatinAmericanSpanish"),
+                      0x0416: ("pt", "Portuguese"),
+                      0xf409: ("en", "SingaporeanEnglish"),
+                      0x040a: ("es", "Spanish"),
+                      0x0809: ("en", "UKEnglish"),
+                      0x0409: ("en", "USEnglish"),
+                     }
 
     def _get_language(self):
         raise NotImplementedError("Engine %s not implemented." % self)

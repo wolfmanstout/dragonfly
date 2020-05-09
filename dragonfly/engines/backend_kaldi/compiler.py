@@ -142,11 +142,12 @@ class KaldiCompiler(CompilerBase, KaldiAGCompiler):
         for rule in grammar.rules:
             if rule.exported:
                 if rule.element is None:
+                    # We cannot deal with an empty rule (could be fixed by refactoring)
                     raise CompilerError("Invalid None element for %s in %s" % (rule, grammar))
 
                 kaldi_rule = KaldiRule(self,
                     name='%s::%s' % (grammar.name, rule.name),
-                    has_dictation=bool((rule.element is not None) and ('<Dictation()>' in rule.gstring())))
+                    has_dictation=bool((rule.element is not None) and ('<Dictation()>' in rule.gstring())))  # FIXME
                 kaldi_rule.parent_grammar = grammar
                 kaldi_rule.parent_rule = rule
                 kaldi_rule_by_rule_dict[rule] = kaldi_rule
@@ -348,7 +349,13 @@ class KaldiCompiler(CompilerBase, KaldiAGCompiler):
     # @trace_compile
     def _compile_impossible(self, element, src_state, dst_state, grammar, kaldi_rule, fst):
         # FIXME: not impossible enough (lower probability?)
-        fst.add_arc(src_state, dst_state, self.impossible_word, weight=0)
+        # Note: setting weight=0 breaks compilation!
+        fst.add_arc(src_state, dst_state, self.impossible_word, weight=1e-10)
+
+    # @trace_compile
+    def _compile_empty(self, element, src_state, dst_state, grammar, kaldi_rule, fst):
+        src_state = self.add_weight_linkage(src_state, dst_state, self.get_weight(element), fst)
+        fst.add_arc(src_state, dst_state, WFST.eps)
 
     #-----------------------------------------------------------------------
     # Utility methods.

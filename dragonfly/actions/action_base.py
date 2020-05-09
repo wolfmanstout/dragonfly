@@ -24,10 +24,11 @@ ActionBase base class
 
 """
 
+from functools import reduce
 from locale import getpreferredencoding
 import logging
 
-from six import PY2, integer_types
+from six import PY2, integer_types, text_type
 
 
 #---------------------------------------------------------------------------
@@ -70,6 +71,12 @@ class ActionBase(object):
     def __iadd__(self, other):
         return ActionSeries(self, other)
 
+    def __or__(self, other):
+        return UnsafeActionSeries(self, other)
+
+    def __ior__(self, other):
+        return UnsafeActionSeries(self, other)
+
     def __mul__(self, factor):
         return ActionRepetition(self, factor)
 
@@ -92,6 +99,10 @@ class ActionBase(object):
                 raise ActionError(str(self))
         except ActionError as e:
             self._log_exec.error("Execution failed: %s", e)
+            return False
+        except Exception as e:
+            self._log_exec.exception("Execution of %s failed due to "
+                                     "exception: %s", self, e)
             return False
         return True
 
@@ -176,7 +187,7 @@ class BoundAction(ActionBase):
         ActionBase.__init__(self)
         self._action = action
         self._data = data
-        self._str = "%s, %s" % (action, data)
+        self._str = "%r, %r" % (action, data)
 
     #-----------------------------------------------------------------------
     # Execution methods.
@@ -198,28 +209,73 @@ class ActionSeries(ActionBase):
     #-----------------------------------------------------------------------
     # Initialization methods.
 
+    #: Whether to stop executing if an action in the series fails.
+    stop_on_failures = True
+
     def __init__(self, *actions):
         ActionBase.__init__(self)
         self._actions = list(actions)
-        self._str = ", ".join(str(a) for a in actions)
+        self._set_str()
+
+    def _set_str(self):
+        # Use a flat list of the series actions for a more readable
+        # string representation.
+        self._str = u", ".join(text_type(a)
+                               for a in self.flat_action_list())
+
+    def flat_action_list(self):
+        # Get a flattened list of the series actions.
+        result = []
+        for action in self._actions:
+            if isinstance(action, ActionSeries) and action.stop_on_failures:
+                result.extend(action.flat_action_list())
+            else:
+                result.append(action)
+        return result
 
     def append(self, other):
         assert isinstance(other, ActionBase)
         self._actions.append(other)
-        self._str = ", ".join(str(a) for a in self._actions)
+        self._set_str()
 
     def __iadd__(self, other):
+        self.append(other)
+        return self
+
+    def __ior__(self, other):
         self.append(other)
         return self
 
     #-----------------------------------------------------------------------
     # Execution methods.
 
+    def _execute(self, data=None):
+        # Use a flat list of the series actions for more sensible sequence
+        # termination and logging if an error occurs during execution.
+        for action in self.flat_action_list():
+            if action.execute(data) is False and self.stop_on_failures:
+                return False
+        return True
+
+    def execute(self, data=None):
+        # Override execute() to discard the return value.
+        ActionBase.execute(self, data)
+
+    def __str__(self):
+        return reduce((lambda x, y: "{}+{}".format(x, y)), self._actions)
+
+
+class UnsafeActionSeries(ActionSeries):
+    stop_on_failures = False
+
     def execute(self, data=None):
         for action in self._actions:
             if action.execute(data) is False:
                 return False
         return True
+
+    def __str__(self):
+        return reduce((lambda x, y: "{}|{}".format(x, y)), self._actions)
 
 
 #---------------------------------------------------------------------------
@@ -253,6 +309,9 @@ class ActionRepetition(ActionBase):
         for _ in range(repeat):
             if self._action.execute(data) is False:
                 raise ActionError(str(self))
+
+    def __str__(self):
+        return '{{{}}}{}'.format(self._action, self._factor)
 
 
 #---------------------------------------------------------------------------
@@ -333,3 +392,6 @@ class Repeat(object):
                                   " (%s)" % (self._extra, e))
             count += additional
         return count
+
+    def __str__(self):
+        return '{}'.format(self._extra if self._extra else self._count)

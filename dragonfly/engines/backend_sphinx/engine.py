@@ -24,34 +24,25 @@ Engine class for CMU Pocket Sphinx
 
 import contextlib
 import locale
-import logging
 import os
 import wave
 
 from six import binary_type, text_type, string_types, PY2
+from jsgf import RootGrammar, PublicRule, Literal
+from sphinxwrapper import PocketSphinx
 
 from dragonfly import Window
-from .recobs import SphinxRecObsManager
-from .timer import SphinxTimerManager
-from .training import write_training_data, write_transcript_files
 from ..base import (EngineBase, EngineError, MimicFailure,
                     DelegateTimerManagerInterface,
                     DictationContainerBase)
-
-try:
-    from jsgf import RootGrammar, PublicRule, Literal
-    from sphinxwrapper import PocketSphinx
-    from .compiler import SphinxJSGFCompiler
-    from .grammar_wrapper import GrammarWrapper
-    from .misc import (EngineConfig, WaveRecognitionObserver,
-                       get_decoder_config_object)
-    from .recording import PyAudioRecorder
-    ENGINE_AVAILABLE = True
-except ImportError:
-    # Import a few things here optionally for readability (the engine won't
-    # start without them) and so that autodoc can import this module without
-    # them.
-    ENGINE_AVAILABLE = False
+from .compiler import SphinxJSGFCompiler
+from .grammar_wrapper import GrammarWrapper
+from .misc import (EngineConfig, WaveRecognitionObserver,
+                   get_decoder_config_object)
+from .recobs import SphinxRecObsManager
+from .recording import PyAudioRecorder
+from .timer import SphinxTimerManager
+from .training import write_training_data, write_transcript_files
 
 
 class UnknownWordError(Exception):
@@ -80,12 +71,9 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         EngineBase.__init__(self)
         DelegateTimerManagerInterface.__init__(self)
 
-        # Set up the engine logger
-        logging.basicConfig()
-
-        if not ENGINE_AVAILABLE:
-            self._log.error("%s: Failed to import jsgf, pyaudio and/or "
-                            "sphinxwrapper. Are they installed?" % self)
+        try:
+            import sphinxwrapper, jsgf, pyaudio
+        except ImportError as e:
             raise EngineError("Failed to import Pocket Sphinx engine "
                               "dependencies.")
 
@@ -750,9 +738,11 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
 
         # Notify observers if a keyphrase was matched.
         result = speech if speech in self._keyphrase_functions else ""
-        if result:
-            words = tuple(result.split())
-            self._recognition_observer_manager.notify_recognition(words)
+        words = tuple(result.split())
+        if words:
+            self._recognition_observer_manager.notify_recognition(
+                words, None, None
+            )
 
         # Call the registered function if there was a match and the function
         # is callable.
@@ -766,10 +756,16 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
                     "keyphrase '%s': %s" % (speech, e)
                 )
 
+        # Notify observers after calling the keyphrase function.
+        if words:
+            self._recognition_observer_manager.notify_post_recognition(
+                words, None, None
+            )
+
         return result
 
     @classmethod
-    def _generate_words_rules(cls, words, mimicking):
+    def _generate_words_rules(cls, words, mimicking, all_dictation):
         # Convert words to Unicode, treat all uppercase words as dictation
         # words and other words as grammar words.
         # Minor note: this won't work for languages without capitalisation.
@@ -777,7 +773,7 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         for word in words.split():
             if isinstance(word, binary_type):
                 word = word.decode(locale.getpreferredencoding())
-            if word.isupper() and mimicking:
+            if all_dictation or word.isupper() and mimicking:
                 # Convert dictation words to lowercase for consistent
                 # output.
                 result.append((word.lower(), 1000000))
@@ -806,6 +802,10 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         hypotheses = {}
         wrappers = self._grammar_wrappers.copy().values()
 
+        # Save the LM hypothesis separately because it will almost always be favoured
+        # over grammar hypotheses.
+        lm_hypothesis = speech
+
         # Count exclusive grammars.
         exclusive_count = 0
         for wrapper in wrappers:
@@ -822,7 +822,6 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
 
         # No grammar has been loaded.
         if not wrappers:
-            # TODO What should we do here? Output formatted Dictation like DNS?
             return processing_occurred, speech
 
         # Batch process audio buffers for each active grammar. Store each
@@ -847,18 +846,28 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
 
         # Get the best hypothesis.
         speech = self._get_best_hypothesis(list(hypotheses.values()))
-        if not speech:
+        if not speech and not lm_hypothesis:
             return processing_occurred, speech
 
-        # Process speech using the first matching grammar.
-        words_rules = self._generate_words_rules(speech, mimicking)
-        for wrapper in wrappers:
-            if hypotheses[wrapper.search_name] != speech:
-                continue
+        if speech:
+            # Process speech using the first matching grammar.
+            words_rules = self._generate_words_rules(speech, mimicking, False)
+            for wrapper in wrappers:
+                if hypotheses[wrapper.search_name] != speech:
+                    continue
 
-            processing_occurred = wrapper.process_words(words_rules)
-            if processing_occurred:
-                break
+                processing_occurred = wrapper.process_words(words_rules)
+                if processing_occurred:
+                    break
+
+        if not processing_occurred:
+            # Process grammars using the LM hypothesis as dictation words.
+            dictation_words = self._generate_words_rules(lm_hypothesis, mimicking,
+                                                         True)
+            for wrapper in wrappers:
+                processing_occurred = wrapper.process_words(dictation_words)
+                if processing_occurred:
+                    break
 
         # Return whether processing occurred and the final speech hypothesis for
         # post processing.
@@ -1017,6 +1026,10 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         """ Mimic a recognition of the given *words* """
         if isinstance(words, (list, tuple)):
             words = " ".join(words)
+
+        # Fail on empty input.
+        if not words:
+            raise MimicFailure("Invalid mimic input %r" % words)
 
         if self.recognition_paused and words == self.config.WAKE_PHRASE:
             self.resume_recognition()
@@ -1183,7 +1196,8 @@ class SphinxEngine(EngineBase, DelegateTimerManagerInterface):
         keyphrase = self.config.WAKE_PHRASE
         words = tuple(keyphrase.strip().split())
         if words and notify:
-            self._recognition_observer_manager.notify_recognition(words)
+            self._recognition_observer_manager.notify_recognition(words, None, None)
+            self._recognition_observer_manager.notify_post_recognition(words, None, None)
 
         # Restore the callbacks to normal
         def hypothesis(hyp):

@@ -1,9 +1,12 @@
 import argparse
+import glob
 import logging
 import os
 import re
 import sys
 import time
+
+import six
 
 from dragonfly import get_engine, MimicFailure, EngineError
 from dragonfly.loader import CommandModule, CommandModuleDirectory
@@ -44,10 +47,15 @@ def _init_engine(args):
 
 
 def _load_cmd_modules(args):
+    # Flatten the file lists.
+    files = []
+    for lst in args.files:
+        files.extend(lst)
+
     # Load each command module. Errors during loading will be caught and
     # logged.
     return_code = 0
-    for f in args.files:
+    for f in files:
         module_ = CommandModule(f.name)
         module_.load()
         if not module_.loaded:
@@ -65,7 +73,13 @@ def _on_begin():
 
 
 def _on_recognition(words):
-    print("Recognized: %s" % " ".join(words))
+    message = u"Recognized: %s" % u" ".join(words)
+
+    # This only seems to be an issue with Python 2.7 on Windows.
+    if six.PY2:
+        encoding = sys.stdout.encoding or "ascii"
+        message = message.encode(encoding, errors='replace')
+    print(message)
 
 
 def _on_failure():
@@ -232,6 +246,23 @@ def _engine_options_string(string):
                 for sub_string in re.split('[,\\s]', string) if sub_string)
 
 
+def _valid_file_or_pattern(string):
+    # Expand glob patterns for non-existing paths.
+    file_type = argparse.FileType("r")
+    if not os.path.exists(string):
+        files = glob.glob(string)
+        if not files:
+            # This should raise Errno 2: no such file or directory.
+            file_type(string)
+
+        # Return the matching files.
+        return [file_type(f) for f in files]
+
+    # Return a single file if the path exists.
+    else:
+        return [file_type(string)]
+
+
 def _valid_directory_path(string):
     if not os.path.isdir(string):
         msg = "%r is not a valid directory path" % string
@@ -256,7 +287,7 @@ def make_arg_parser():
 
     # Define common arguments.
     cmd_module_files_argument = _build_argument(
-        "files", metavar="file", nargs="*", type=argparse.FileType("r"),
+        "files", metavar="file", nargs="*", type=_valid_file_or_pattern,
         help="Command module file(s)."
     )
     engine_options_argument = _build_argument(

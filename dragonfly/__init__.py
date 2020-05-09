@@ -25,7 +25,8 @@ from .config            import Config, Section, Item
 from .error             import DragonflyError, GrammarError
 
 # --------------------------------------------------------------------------
-from .engines           import get_engine, EngineError, MimicFailure
+from .engines           import (get_engine, EngineError, MimicFailure,
+                                get_current_engine)
 
 # --------------------------------------------------------------------------
 from .grammar.grammar_base       import Grammar
@@ -36,7 +37,8 @@ from .grammar.rule_mapping       import MappingRule
 from .grammar.elements  import (ElementBase, Sequence, Alternative,
                                 Optional, Repetition, Literal,
                                 ListRef, DictListRef, Dictation, Modifier,
-                                RuleRef, RuleWrap, Empty, Compound, Choice)
+                                RuleRef, RuleWrap, Compound, Choice,
+                                Empty, Impossible)
 
 from .grammar.context   import Context, AppContext, FuncContext
 from .grammar.list      import ListBase, List, DictList
@@ -45,7 +47,9 @@ from .grammar.recobs    import (RecognitionObserver, RecognitionHistory,
 from .grammar.recobs_callbacks   import (CallbackRecognitionObserver,
                                          register_beginning_callback,
                                          register_recognition_callback,
-                                         register_failure_callback)
+                                         register_failure_callback,
+                                         register_ending_callback,
+                                         register_post_recognition_callback)
 
 # --------------------------------------------------------------------------
 
