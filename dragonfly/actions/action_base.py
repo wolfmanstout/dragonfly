@@ -270,9 +270,7 @@ class UnsafeActionSeries(ActionSeries):
 
     def execute(self, data=None):
         for action in self._actions:
-            if action.execute(data) is False:
-                return False
-        return True
+            action.execute(data)
 
     def __str__(self):
         return reduce((lambda x, y: "{}|{}".format(x, y)), self._actions)
