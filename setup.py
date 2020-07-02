@@ -43,10 +43,13 @@ class test(Command):
         # (long option, short option, description)
         # '=' means an argument should be supplied.
         ('test-suite=', None, 'Dragonfly engine to test (default: "text")'),
+        ('pytest-options=', 'o',
+            'pytest options (ex: "-s" to expose stdout/stdin)'),
     ]
 
     def initialize_options(self):
         self.test_suite = 'text'
+        self.pytest_options = ''
 
     def finalize_options(self):
         # Check that 'test_suite' is an engine name.
@@ -55,10 +58,13 @@ class test(Command):
         assert suite in engine_tests_dict.keys(), \
             "the test suite value must be an engine name, not '%s'" % suite
 
+        # Split pytest options into a list.
+        self.pytest_options = self.pytest_options.split()
+
     def run(self):
         from dragonfly.test.suites import run_pytest_suite
         print("Test suite running for engine '%s'" % self.test_suite)
-        result = run_pytest_suite(self.test_suite)
+        result = run_pytest_suite(self.test_suite, self.pytest_options)
 
         # Exit using pytest's return code.
         exit(int(result))
@@ -86,6 +92,7 @@ setup(
       include_package_data=True,
       install_requires=[
                         "setuptools >= 40.0.0",
+                        "packaging >= 19.0",
                         "six",
                         "pyperclip >= 1.7.0",
                         "enum34;python_version<'3.4'",
@@ -107,7 +114,6 @@ setup(
                         "pynput >= 1.4.2;platform_system=='Darwin'",
                         "pyobjc >= 5.2;platform_system=='Darwin'",
                         "py-applescript == 1.0.0;platform_system=='Darwin'",
-                        "psutil >= 5.5.1;platform_system=='Darwin'",
 
                         # RPC requirements
                         "json-rpc",
@@ -123,8 +129,8 @@ setup(
                     ],
           "kaldi": [
                     "kaldi-active-grammar ~= %s" % read("dragonfly", "engines", "backend_kaldi", "kag_version.txt").strip(),
-                    "pyaudio == 0.2.*",
-                    "webrtcvad == 2.0.*",
+                    "sounddevice == 0.3.*",
+                    "webrtcvad-wheels == 2.0.*",
                    ],
       },
 

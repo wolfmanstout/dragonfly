@@ -33,7 +33,7 @@ affiliated with the dragonfly project itself).
 * `Engine Configuration`_
 * `Cross-platform`_
 * `User Lexicon`_
-* `Grammar/Rule Weights`_
+* `Grammar/Rule/Element Weights`_
 * `Retaining Audio and/or Recognition Metadata`_
 * `Alternative/Cloud Dictation`_
 
@@ -151,9 +151,11 @@ the ``get_engine()`` function, which passes them to the
     tmp_dir='kaldi_tmp',
     input_device_index=None,
     retain_dir=None,
+    retain_audio=None,
+    retain_metadata=None,
     vad_aggressiveness=3,
-    vad_padding_start_ms=300,
-    vad_padding_end_ms=100,
+    vad_padding_start_ms=150,
+    vad_padding_end_ms=150,
     vad_complex_padding_end_ms=500,
     auto_add_to_user_lexicon=True,
     lazy_compilation=True,
@@ -177,14 +179,23 @@ the ``get_engine()`` function, which passes them to the
   a list your available input devices and their corresponding indexes, call
   ``get_engine('kaldi').print_mic_list()``
 
-* ``retain_dir`` (``str|None``) -- Retains recognized audio & metadata in the
-  given directory, saving audio to ``retain_[timestamp].wav`` file and
-  metadata to ``retain.tsv``. See below for more information.
+* ``retain_dir`` (``str|None``) -- Retains recognized audio and/or
+  metadata in the given directory, saving audio to
+  ``retain_[timestamp].wav`` file and metadata to ``retain.tsv``. What is
+  automatically retained it is determined by ``retain_audio`` and
+  ``retain_metadata``. If both are ``False`` but this is set, you can
+  actively choose to retain a given recognition. See below for more
+  information.
 
-* ``retain_audio`` (``bool|None``) -- Whether to retain audio data, in
-  addition to the recognition metadata. If ``True``, then requires
-  ``retain_dir`` to be set. If ``None``, then defaults to ``True`` if
-  ``retain_dir`` to be set. See below for more information.
+* ``retain_audio`` (``bool|None``) -- Whether to retain audio data for
+  all recognitions. If ``True``, then requires ``retain_dir`` to be set.
+  If ``None``, then defaults to ``True`` if ``retain_dir`` is set to
+  ``True``. See below for more information.
+
+* ``retain_metadata`` (``bool|None``) -- Whether to retain metadata for
+  all recognitions. If ``True``, then requires ``retain_dir`` to be set.
+  If ``None``, then defaults to ``True`` if ``retain_dir`` is set to
+  ``True``. See below for more information.
 
 * ``vad_aggressiveness`` (``int``) -- Aggressiveness of the Voice Activity
   Detector: an integer between ``0`` and ``3``, where ``0`` is the least
@@ -250,8 +261,9 @@ for words in grammars & language models in order to recognize them. The
 default model comes with a large dictionary, but obviously cannot
 include all possible words. There are multiple ways of handling this.
 
-**Ignoring unknown words:** If you use words in your grammars that are *not* in the
-dictionary, a message similar to the following will be printed::
+**Ignoring unknown words:** If you use words in your grammars that are
+*not* in the dictionary, a message similar to the following will be
+printed::
 
   Word not in lexicon (will not be recognized): 'notaword'
 
@@ -310,6 +322,11 @@ or run::
 probably should) copy your ``user_lexicon.txt`` file from your old model
 directory to the new one. This will let you keep your additions.
 
+Also, if there is a ``user_lexicon.txt`` file in the current working
+directory of your initial loader script, its contents will be
+automatically added to the ``user_lexicon.txt`` in the active model when
+it is loaded.
+
 User Lexicon and Dictation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -337,26 +354,37 @@ recognized, possibly with the addition of a weight parameter.
 Future development work includes improving on these issues.
 
 
-Grammar/Rule Weights
+Grammar/Rule/Element Weights
 ----------------------------------------------------------------------------
-Grammars and/or rules can have a weight specified, where grammars/rules
-with higher weight value are more likely to be recognized, compared to
-their peers, for an ambiguous recognition. This can be used to adjust
-the probability of them be recognized.
+Grammars, rules, and/or elements can have a weight specified, where
+those with higher weight value are more likely to be recognized,
+compared to their peers, for an ambiguous recognition. This can be used
+to adjust the probability of them be recognized.
 
-The default weight value is ``1``. Two competing rules with weights of
-``1`` and ``2`` will result in the latter being twice as likely to be
-recognized then if the weights were equal. Similarly for ``1`` and
-``0.5``. An example::
+The default weight value for everything is ``1.0``. The exact meaning of
+the weight number is somewhat inscrutable, but you can treat larger
+values as more likely to be recognized, and smaller values as less
+likely. **Note:** you may need to use much larger or smaller numbers
+than you might expect to achieve your desired results, possibly orders
+of magnitude (base 10).
+
+An example::
 
   class WeightExample1Rule(MappingRule):
-      mapping = { "i scream": ActionBase() }
+      mapping = { "kiss this guy": ActionBase() }
   class WeightExample2Rule(MappingRule):
-      mapping = { "ice cream": ActionBase() }
+      mapping = { "kiss the sky": ActionBase() }
       weight = 2
+  class WeightExample3Rule(MappingRule):
+      mapping = {
+        "start listening {weight=0.01}": ActionBase(),  # Be less eager to wake up!
+        "halt listening": ActionBase(),
+        "go (north | nowhere {w=0.01} | south)": ActionBase(),
+      }
 
 The weight of a grammar is effectively propagated equally to its child
-rules, on top of their own weights.
+rules, on top of their own weights. Similarly for rules propagating
+weights to child elements.
 
 
 Retaining Audio and/or Recognition Metadata
@@ -367,11 +395,32 @@ recognition, using the ``retain_dir`` engine parameter.
 
 **Note:** This feature is completely optional and disabled by default!
 
-You can also mark the previous recognition with a single text tag to be
-stored in the metadata. For example, mark it as incorrect with a rule
+The metadata is saved `TSV
+<https://en.wikipedia.org/wiki/Tab-separated_values>`__ format, with
+fields in the following order:
+
+* ``audio_data``: file name of the audio file for the recognition
+* ``grammar_name``: name of the recognized grammar
+* ``rule_name``: name of the recognized rule
+* ``text``: text of the recognition
+* ``likelihood``: the engine's estimated confidence of the recognition (not very reliable)
+* ``tag``: a single text tag, described below
+* ``has_dictation``: whether the recognition contained (in part) a dictation element
+
+**Tag:** You can mark the previous recognition with a single text tag to
+be stored in the metadata. For example, mark it as incorrect with a rule
 containing::
 
   "action whoops": Function(lambda: engines.get_engine().audio_store[0].set('tag', 'misrecognition'))
+
+Or, you can mark it specifically to be saved, even if ``retain_audio``
+is ``False`` and recognitions are not normally saved, as long as
+``retain_dir`` is set. This also demonstrates that ``.set()`` can be
+chained to tag it at the same time::
+
+  "action corrected": Function(lambda: engines.get_engine().audio_store[0].set('tag', 'corrected').set('force_save', True))
+
+This is useful for retaining only known-correct data for later training.
 
 
 Alternative/Cloud Dictation
@@ -389,6 +438,15 @@ in another language, or some other reason. You can use one of:
 * a cloud speech recognition engine
 
 **Note:** This feature is completely optional and disabled by default!
+
+You can enable this by setting the ``alternative_dictation`` engine
+option. Valid options:
+
+* ``'gcloud'``: Cloud dictation with Google Cloud Speech-to-Text
+* A ``callable`` object: Any external engine. The callable must accept at
+  least one argument (for the audio data) and any keyword arguments. The
+  audio data is passed in standard Linear16 (``int``) PCM encoding. The
+  callable should return the recognized text.
 
 Cloud Dictation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

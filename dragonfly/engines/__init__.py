@@ -25,6 +25,7 @@ Main SR engine back-end interface
 """
 
 import logging
+import os
 import traceback
 from .base import EngineBase, EngineError, MimicFailure
 
@@ -49,6 +50,7 @@ def get_engine(name=None, **kwargs):
         :param \\**kwargs: optional keyword arguments passed through to the
             engine for engine-specific configuration.
         :rtype: EngineBase
+        :returns: engine object
         :raises: EngineError
     """
     global _default_engine, _engines_by_name
@@ -56,13 +58,25 @@ def get_engine(name=None, **kwargs):
 
     if name and name in _engines_by_name:
         # If the requested engine has already been loaded, return it.
+        if kwargs is not None and len(kwargs) > 0:
+            message = ("Error: Passing get_engine arguments to an engine that has already been created, hence these arguments are ignored.")
+            print(message)
+            raise EngineError(message)
         return _engines_by_name[name]
     elif not name and _default_engine:
         # If no specific engine is requested and an engine has already
         #  been loaded, return it.
+        if kwargs is not None and len(kwargs) > 0:
+            message = ("Error: Passing get_engine arguments to an engine that has already been created, hence these arguments are ignored.")
+            print(message)
+            raise EngineError(message)
         return _default_engine
 
-    if not name or name == "natlink":
+    # Check if we're on Windows. If name is None and we're not on Windows,
+    # then we don't evaluate Windows-only engines like natlink.
+    windows = os.name == 'nt'
+
+    if (windows and not name) or name == "natlink":
         # Attempt to retrieve the natlink back-end.
         try:
             from .backend_natlink import is_engine_available
@@ -74,13 +88,12 @@ def get_engine(name=None, **kwargs):
         except Exception as e:
             message = ("Exception while initializing natlink engine:"
                        " %s" % (e,))
-            log.exception(message)
-            traceback.print_exc()
             print(message)
             if name:
                 raise EngineError(message)
 
-    if not name or name in ["sapi5shared", "sapi5inproc", "sapi5"]:
+    sapi5_names = ["sapi5shared", "sapi5inproc", "sapi5"]
+    if (windows and not name) or name in sapi5_names:
         # Attempt to retrieve the sapi5 back-end.
         try:
             from .backend_sapi5 import is_engine_available
@@ -92,8 +105,6 @@ def get_engine(name=None, **kwargs):
         except Exception as e:
             message = ("Exception while initializing sapi5 engine:"
                        " %s" % (e,))
-            log.exception(message)
-            traceback.print_exc()
             print(message)
             if name:
                 raise EngineError(message)
@@ -111,8 +122,6 @@ def get_engine(name=None, **kwargs):
             message = ("Exception while initializing sphinx engine:"
                        " %s" % (e,))
             log.exception(message)
-            traceback.print_exc()
-            print(message)
             if name:
                 raise EngineError(message)
 
@@ -128,8 +137,6 @@ def get_engine(name=None, **kwargs):
         except Exception as e:
             message = ("Exception while initializing kaldi engine:"
                        " %s" % (e,))
-            log.exception(message)
-            traceback.print_exc()
             print(message)
             if name:
                 raise EngineError(message)
@@ -149,8 +156,6 @@ def get_engine(name=None, **kwargs):
         except Exception as e:
             message = ("Exception while initializing text-input engine:"
                        " %s" % (e,))
-            log.exception(message)
-            traceback.print_exc()
             print(message)
             if name:
                 raise EngineError(message)
@@ -158,7 +163,42 @@ def get_engine(name=None, **kwargs):
     if not name:
         raise EngineError("No usable engines found.")
     else:
-        raise EngineError("Requested engine %r not available." % (name,))
+        valid_names = ["natlink", "kaldi", "sphinx", "sapi5shared"
+                       "sapi5inproc", "sapi5"]
+        if name not in valid_names:
+            raise EngineError("Requested engine %r is not a valid engine "
+                              "name." % (name,))
+        else:
+            raise EngineError("Requested engine %r not available."
+                              % (name,))
+
+
+def get_current_engine():
+    """
+        Get the currently initialized SR engine object.
+
+        If an SR engine has not been initialized yet, ``None`` will be
+        returned instead.
+
+        :rtype: EngineBase | None
+        :returns: engine object or None
+
+        Usage example:
+
+        .. code-block:: python
+
+           # Print the name of the current engine if one has been
+           # initialized.
+           from dragonfly import get_current_engine
+           engine = get_current_engine()
+           if engine:
+               print("Engine name: %r" % engine.name)
+           else:
+               print("No engine has been initialized.")
+
+    """
+    global _default_engine
+    return _default_engine
 
 
 # ---------------------------------------------------------------------------

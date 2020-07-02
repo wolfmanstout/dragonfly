@@ -22,30 +22,33 @@
 Kaldi engine classes
 """
 
-import collections, os, subprocess, threading, time
+import collections, logging, os, subprocess, sys, threading, time
 
-from six import integer_types, string_types, print_
+from packaging.version import Version
+from six import integer_types, string_types, print_, reraise
 from six.moves import zip
+import kaldi_active_grammar
+from kaldi_active_grammar       import KaldiAgfNNet3Decoder, KaldiError
 
 from ..base                     import (EngineBase, EngineError, MimicFailure,
-                                        DelegateTimerManager, DelegateTimerManagerInterface, DictationContainerBase)
+                                        DelegateTimerManager,
+                                        DelegateTimerManagerInterface,
+                                        DictationContainerBase)
+from .audio                     import MicAudio, VADAudio, AudioStore, WavAudio
 from .recobs                    import KaldiRecObsManager
 from .testing                   import debug_timer
-from ...grammar.state           import State
-from ...windows                 import Window
+from dragonfly.grammar.state    import State
+from dragonfly.windows          import Window
 
+# Import the Kaldi compiler class. Suppress metaclass TypeErrors raised
+# during documentation builds caused by mocking KAG.
 try:
-    import kaldi_active_grammar
-    from kaldi_active_grammar       import KaldiAgfNNet3Decoder, KaldiError
     from .compiler                  import KaldiCompiler
-    from .audio                     import MicAudio, VADAudio, AudioStore, WavAudio
-    ENGINE_AVAILABLE = True
-except ImportError:
-    # Import a few things here optionally for readability (the engine won't
-    # start without them) and so that autodoc can import this module without
-    # them.
-    ENGINE_AVAILABLE = False
-
+except TypeError:
+    if os.environ.get("SPHINX_BUILD_RUNNING"):
+        KaldiCompiler = None
+    else:
+        reraise(*sys.exc_info())
 
 #===========================================================================
 
@@ -58,7 +61,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
     #-----------------------------------------------------------------------
 
     def __init__(self, model_dir=None, tmp_dir=None,
-        input_device_index=None, retain_dir=None, retain_audio=None, vad_aggressiveness=3,
+        input_device_index=None, retain_dir=None, retain_audio=None, retain_metadata=None, vad_aggressiveness=3,
         vad_padding_start_ms=150, vad_padding_end_ms=150, vad_complex_padding_end_ms=500,
         auto_add_to_user_lexicon=True, lazy_compilation=True, invalidate_cache=False,
         alternative_dictation=None, cloud_dictation_lang='en-US',
@@ -66,20 +69,29 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
         EngineBase.__init__(self)
         DelegateTimerManagerInterface.__init__(self)
 
-        if not ENGINE_AVAILABLE:
-            self._log.error("%s: Failed to import Kaldi engine dependencies. Are they installed?" % self)
+        try:
+            import kaldi_active_grammar, sounddevice, webrtcvad
+        except ImportError as e:
+            self._log.error("%s: Failed to import Kaldi engine "
+                            "dependencies: %s", self, e)
             raise EngineError("Failed to import Kaldi engine dependencies.")
+
+        # Compatible release version specification
+        # https://stackoverflow.com/questions/11887762/how-do-i-compare-version-numbers-in-python/21065570
         with open(os.path.join(os.path.dirname(__file__), 'kag_version.txt')) as file:
-            required_kag_version = file.read().strip()
-        # Compatible release version specification (we could use pkg_resources.require, but is it always installed?)
-        required_kag_version_split = required_kag_version.split('.')
-        kag_version = kaldi_active_grammar.__version__
-        kag_version_split = kag_version.split('.')
-        assert len(required_kag_version_split) == len(kag_version_split) == 3
-        if not ((kag_version_split[:-1] == required_kag_version_split[:-1]) and (kag_version_split[-1] >= required_kag_version_split[-1])):
+            required_kag_version = Version(file.read().strip())
+        kag_version = Version(kaldi_active_grammar.__version__)
+        if not ((kag_version >= required_kag_version) and (kag_version.release[0:2] == required_kag_version.release[0:2])):
             self._log.error("%s: Incompatible kaldi_active_grammar version %s! Expected ~= %s!" % (self, kag_version, required_kag_version))
             self._log.error("See https://dragonfly2.readthedocs.io/en/latest/kaldi_engine.html#updating-to-a-new-version")
             raise EngineError("Incompatible kaldi_active_grammar version")
+
+        # Hack to avoid bug processing keyboard actions on Windows
+        if os.name == 'nt':
+            action_exec_logger = logging.getLogger('action.exec')
+            if action_exec_logger.getEffectiveLevel() > logging.DEBUG:
+                self._log.warning("%s: Enabling logging of actions execution to avoid bug processing keyboard actions on Windows", self)
+                action_exec_logger.setLevel(logging.DEBUG)
 
         if not (isinstance(retain_dir, string_types) or (retain_dir is None)):
             self._log.error("Invalid retain_dir: %r" % retain_dir)
@@ -94,13 +106,14 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
             input_device_index = input_device_index,
             retain_dir = retain_dir,
             retain_audio = bool(retain_audio) if retain_audio is not None else bool(retain_dir),
-            vad_aggressiveness = vad_aggressiveness,
-            vad_padding_start_ms = vad_padding_start_ms,
-            vad_padding_end_ms = vad_padding_end_ms,
-            vad_complex_padding_end_ms = vad_complex_padding_end_ms,
-            auto_add_to_user_lexicon = auto_add_to_user_lexicon,
-            lazy_compilation = lazy_compilation,
-            invalidate_cache = invalidate_cache,
+            retain_metadata = bool(retain_metadata) if retain_metadata is not None else bool(retain_dir),
+            vad_aggressiveness = int(vad_aggressiveness),
+            vad_padding_start_ms = int(vad_padding_start_ms),
+            vad_padding_end_ms = int(vad_padding_end_ms),
+            vad_complex_padding_end_ms = int(vad_complex_padding_end_ms),
+            auto_add_to_user_lexicon = bool(auto_add_to_user_lexicon),
+            lazy_compilation = bool(lazy_compilation),
+            invalidate_cache = bool(invalidate_cache),
             alternative_dictation = alternative_dictation,
             cloud_dictation_lang = cloud_dictation_lang,
         )
@@ -147,7 +160,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
             complex_end_window_ms=self._options['vad_complex_padding_end_ms'],
             )
         self.audio_store = AudioStore(self._audio, maxlen=(1 if self._options['retain_dir'] else 0),
-            save_dir=self._options['retain_dir'], save_audio=self._options['retain_audio'])
+            save_dir=self._options['retain_dir'], save_audio=self._options['retain_audio'], save_metadata=self._options['retain_metadata'])
 
         self._any_exclusive_grammars = False
         self._in_phrase = False
@@ -311,7 +324,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
                         self.audio_store.add_block(block)
                     output, likelihood = self._decoder.get_output()
                     self._log.log(5, "Partial phrase: likelihood %f, %r [in_complex=%s]", likelihood, output, in_complex)
-                    kaldi_rule, words, words_are_dictation, in_dictation = self._compiler.parse_partial_output(output)
+                    kaldi_rule, words, words_are_dictation_mask, in_dictation = self._compiler.parse_partial_output(output)
                     in_complex = bool(in_dictation or (kaldi_rule and kaldi_rule.is_complex))
 
                 else:
@@ -324,8 +337,13 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
                         self._log.log(15, "End of phrase: likelihood %f, rule %s, %r" % (likelihood, kaldi_rule, parsed_output))
                         if self._saving_adaptation_state and parsed_output != '':  # Don't save adaptation state for empty recognitions
                             self._decoder.save_adaptation_state()
-                        if self.audio_store and kaldi_rule:
-                            self.audio_store.finalize(parsed_output, kaldi_rule.parent_grammar.name, kaldi_rule.parent_rule.name, likelihood)
+                        if self.audio_store:
+                            if kaldi_rule and parsed_output != '':  # Don't store audio/metadata for empty recognitions
+                                self.audio_store.finalize(parsed_output,
+                                    kaldi_rule.parent_grammar.name, kaldi_rule.parent_rule.name,
+                                    likelihood=likelihood, has_dictation=kaldi_rule.has_dictation)
+                            else:
+                                self.audio_store.cancel()
 
                     self._in_phrase = False
                     self._ignore_current_phrase = False
@@ -442,10 +460,10 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
                     results.sort(key=lambda result: 100 if result[0].has_dictation else 0)
 
                 kaldi_rule, words = results[0]
-                words_are_dictation = [True] * len(words)  # FIXME: hack, but seems to work fine? only a problem for ambiguous rules containing dictation, which should be handled above
+                words_are_dictation_mask = [True] * len(words)  # FIXME: hack, but seems to work fine? only a problem for ambiguous rules containing dictation, which should be handled above
 
         elif self._compiler.parsing_framework == 'token':
-            kaldi_rule, words, words_are_dictation = self._compiler.parse_output(output,
+            kaldi_rule, words, words_are_dictation_mask = self._compiler.parse_output(output,
                 dictation_info_func=lambda: (self.audio_store.current_audio_data, self._decoder.get_word_align(output)))
             if kaldi_rule is None:
                 if words != []:
@@ -464,10 +482,9 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
             raise EngineError("Invalid _compiler.parsing_framework")
 
         words = tuple(words)
-        self._recognition_observer_manager.notify_recognition(words)
         grammar_wrapper = self._get_grammar_wrapper(kaldi_rule.parent_grammar)
         with debug_timer(self._log.debug, "dragonfly parse time"):
-            grammar_wrapper.recognition_callback(words, kaldi_rule.parent_rule, words_are_dictation)
+            grammar_wrapper.recognition_callback(words, kaldi_rule.parent_rule, words_are_dictation_mask)
 
         parsed_output = ' '.join(words)
         return kaldi_rule, parsed_output
@@ -488,12 +505,12 @@ class GrammarWrapper(object):
     def phrase_start_callback(self, fg_window):
         self.grammar.process_begin(fg_window.executable, fg_window.title, fg_window.handle)
 
-    def recognition_callback(self, words, rule, words_are_dictation):
+    def recognition_callback(self, words, rule, words_are_dictation_mask):
         try:
             # Prepare the words and rule names for the element parsers
-            rule_names = (rule.name,) + (('dgndictation',) if any(words_are_dictation) else ())
+            rule_names = (rule.name,) + (('dgndictation',) if any(words_are_dictation_mask) else ())
             words_rules = tuple((word, 0 if not is_dictation else 1)
-                for (word, is_dictation) in zip(words, words_are_dictation))
+                for (word, is_dictation) in zip(words, words_are_dictation_mask))
 
             # Attempt to parse the recognition
             func = getattr(self.grammar, "process_recognition", None)
@@ -506,8 +523,10 @@ class GrammarWrapper(object):
             for result in rule.decode(state):
                 if state.finished():
                     root = state.build_parse_tree()
+                    self.engine._recognition_observer_manager.notify_recognition(words, rule, root)
                     with debug_timer(self.engine._log.debug, "rule execution time"):
                         rule.process_recognition(root)
+                    self.engine._recognition_observer_manager.notify_post_recognition(words, rule, root)
                     return
 
         except Exception as e:
