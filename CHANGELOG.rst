@@ -11,6 +11,144 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
+0.23.2_ - 2020-04-11
+--------------------
+
+Fixed
+~~~~~
+* Add missing __str__ visualization method for UnsafeActionSeries.
+* Add missing catch for IOErrors in the Function.__str__() method.
+* Fix __str__ visualization methods that break Unicode support.
+* Fix some bugs with how Dragonfly command modules are loaded.
+
+
+0.23.1_ - 2020-04-09
+--------------------
+
+Fixed
+~~~~~
+* Add temporary mitigation for Windows keyboard action processing bug
+  specific to the Kaldi engine (thanks `@daanzu`_).
+
+
+0.23.0_ - 2020-04-06
+--------------------
+
+Changed
+~~~~~~~
+* Add get_current_engine() function that doesn't initialize an engine.
+* Add is_primary and name properties to all Monitor classes.
+* Change SAPI5 engine backend to use the recognizer language selected in the
+  options window instead of "en".
+* Reword confusing Natlink warning message shown when Dragon isn't running.
+* Update and fix various parts of the documentation.
+
+Fixed
+~~~~~
+* Add automatic fix for the NatlinkEngine class that allows threads to work
+  properly after the first grammar is loaded.
+* Change Dragonfly monitor lists to always have the primary monitor with
+  coordinates (0, 0) first on the list.
+* Fix Mouse action bug with negative absolute screen coordinates that made
+  monitors tricky to access sometimes.
+* Fix bug where X11Window.executable may return None in certain
+  circumstances.
+* Support AppContext edge cases where window executables or titles aren't
+  valid (thanks `@shervinemami`_).
+
+
+0.22.0_ - 2020-03-20
+--------------------
+
+Changed
+~~~~~~~
+* Add __str__ method to essential action classes for visualization (thanks
+  `@dmakarov`_).
+* Change the Dictation element's value to be a list of recognized words
+  instead of a DictationContainer object if the 'format' constructor
+  argument is False. Previously, the 'format' argument did nothing.
+* Make various improvements to Dragonfly's documentation.
+* Make various improvements to the Kaldi engine's audio code (thanks
+  `@daanzu`_).
+
+Fixed
+~~~~~
+* Add code to verify that natlink is on the Python path before initializing
+  the engine (thanks `@LexiconCode`_).
+* Fix Python 2.7 console output encoding errors in on_recognition()
+  callbacks in CLI and module loaders.
+* Fix a minor bug in DictListRef's constructor.
+* Fix bugs where X11 Keyboard and Window class sub-processes can exit early.
+* Fix encoding bug with the string representation of BoundAction.
+* Fix some Python 3.x bugs with the Natlink engine and its tests (thanks
+  `@mrob95`_).
+* Make DarwinWindow get_window_module/pid methods error safe (thanks
+  `@dmakarov`_).
+
+
+0.21.1_ - 2020-02-24
+--------------------
+
+Fixed
+~~~~~
+* Add set_exclusive() alias methods to Grammar & EngineBase classes to make
+  some older grammars work again.
+* Fix a few issues related to the Impossible and Empty elements
+  (thanks `@caspark`_ and `@daanzu`_).
+* Fix Win32 modifier bug where the control key could be released if held
+  down when Window.set_foreground() is called.
+* Make all engine mimic() methods fail properly when given empty input.
+
+0.21.0_ - 2020-02-15
+--------------------
+
+Added
+~~~~~
+* Add optional recursive mode to CommandModuleDirectory class.
+* Add new load and load-directory CLI commands as alternatives to module
+  loader scripts.
+* Add new on_end() and on_post_recognition() recognition observers
+  with optional parameters (thanks `@daanzu`_).
+* Add Window.set_focus() method for focusing windows without raising them
+  (only supported on X11).
+* Add 'focus_only' argument to BringApp and FocusWindow actions to support
+  focusing windows without raising them (only supported on X11).
+
+Changed
+~~~~~~~
+* Add context manager to ListBase class for optimized list updates.
+* Add missing CommandModule properties and methods to CommandModuleDirectory
+  class.
+* Change ActionBase class to catch all exceptions raised during execution,
+  not just ActionErrors (thanks `@daanzu`_).
+* Change ActionSeries class to stop execution if errors occur. The
+  ActionSeries.stop_on_failures attribute, UnsafeActionSeries class and
+  the '|' and '\|\=' operators can be used to have the previous behaviour.
+* Change Kaldi retain support to allow retaining only specifically chosen
+  recognitions (thanks `@daanzu`_).
+* Change on_recognition() recognition observer to allow optional rule and
+  node parameters on functions (thanks `@daanzu`_).
+* Change setup.py test command to support running the test suites with
+  different pytest options (thanks `@daanzu`_).
+* Change the StartApp action to use the macOS 'open' program if applicable.
+* Clean up and enhance log messages and dependency checks done in the
+  is_engine_available() and get_engine() functions (thanks `@LexiconCode`_).
+* Use application IDs instead of application names to differentiate between
+  different application processes on macOS (thanks `@dmakarov`_).
+
+Fixed
+~~~~~
+* Fix Dragonfly's CLI so glob patterns are expanded where necessary (i.e. if
+  using cmd.exe on Windows).
+* Fix Kaldi version number checking (thanks `@daanzu`_).
+* Fix Python 2/3 bool incompatibility with dictation containers
+  (thanks `@daanzu`_).
+* Fix bug with CommandModuleDirectory 'excludes' constructor parameter.
+* Fix bug with the command-line interface where the 'command' argument
+  wasn't required.
+* Fix Function action deprecation warning in Python 3.
+
+
 0.20.0_ - 2020-01-03
 --------------------
 
@@ -717,7 +855,13 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.20.0...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.23.2...HEAD
+.. _0.23.2:      https://github.com/dictation-toolbox/dragonfly/compare/0.23.1...0.23.2
+.. _0.23.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.23.0...0.23.1
+.. _0.23.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.22.0...0.23.0
+.. _0.22.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.21.1...0.22.0
+.. _0.21.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.21.0...0.21.1
+.. _0.21.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.20.0...0.21.0
 .. _0.20.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.19.0...0.20.0
 .. _0.19.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.19.0...0.19.1
 .. _0.19.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.18.0...0.19.0
@@ -752,11 +896,14 @@ This release is the first in the Git version control system.
 .. _@Versatilus: https://github.com/Versatilus
 .. _@alexboche: https://github.com/alexboche
 .. _@calmofthestorm: https://github.com/calmofthestorm
+.. _@caspark: https://github.com/caspark
 .. _@comodoro: https://github.com/comodoro
 .. _@daanzu: https://github.com/daanzu
+.. _@dmakarov: https://github.com/dmakarov
 .. _@dusty-phillips: https://github.com/dusty-phillips
 .. _@lexxish: https://github.com/lexxish
 .. _@mrob95: https://github.com/mrob95
+.. _@shervinemami: https://github.com/shervinemami
 .. _@tylercal: https://github.com/tylercal
 .. _@wolfmanstout: https://github.com/wolfmanstout
 

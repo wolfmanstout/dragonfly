@@ -30,6 +30,7 @@ from __future__ import print_function
 
 import locale
 import logging
+import os
 from subprocess import Popen, PIPE
 import sys
 
@@ -92,7 +93,15 @@ class X11Window(BaseWindow):
         full_readable_command = ' '.join(full_command)
         cls._log.debug(full_readable_command)
         try:
-            p = Popen(full_command, stdout=PIPE, stderr=PIPE)
+            kwargs = dict(stdout=PIPE, stderr=PIPE)
+
+            # Fork the process with setsid() if on a POSIX system such as
+            # Linux.
+            if os.name == 'posix':
+                kwargs.update(dict(preexec_fn=os.setsid))
+
+            # Execute the child process.
+            p = Popen(full_command, **kwargs)
             stdout, stderr = p.communicate()
 
             # Decode output if it is binary.
@@ -333,12 +342,12 @@ class X11Window(BaseWindow):
     def _get_window_module(self):
         # Get the executable using the process ID and psutil.
         pid = self.pid
-        if pid is None:
+        if pid == -1:
             self._executable = ''
         elif self._executable == -1:
-            for p in psutil.process_iter(attrs=['pid', 'exe']):
+            for p in psutil.process_iter(attrs=['pid', 'exe', 'name']):
                 if p.info['pid'] == pid:
-                    self._executable = p.info['exe']
+                    self._executable = p.info['exe'] or p.info['name']
                     return self._executable
 
             # Set to '' if it wasn't found.

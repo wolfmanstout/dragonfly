@@ -114,7 +114,6 @@ setup(
                         "pynput >= 1.4.2;platform_system=='Darwin'",
                         "pyobjc >= 5.2;platform_system=='Darwin'",
                         "py-applescript == 1.0.0;platform_system=='Darwin'",
-                        "psutil >= 5.5.1;platform_system=='Darwin'",
 
                         # RPC requirements
                         "json-rpc",
@@ -130,8 +129,8 @@ setup(
                     ],
           "kaldi": [
                     "kaldi-active-grammar ~= %s" % read("dragonfly", "engines", "backend_kaldi", "kag_version.txt").strip(),
-                    "pyaudio == 0.2.*",
-                    "webrtcvad == 2.0.*",
+                    "sounddevice == 0.3.*",
+                    "webrtcvad-wheels == 2.0.*",
                    ],
       },
 

@@ -1,9 +1,11 @@
 Alex Boche <akboche@gmail.com>
 Alex Roper <alex@aroper.net>
+Caspar Krieger <git@asparck.com>
 Christo Butcher <t4ngo@twizzy.biz>
 Christopher Schnick <c.schnick@monospark.org>
 Dane Finlay <Danesprite@posteo.net>
 David Zurow <daanzu@gmail.com>
+Dmitri Makarov <dmakarov@alumni.stanford.edu>
 Dusty Phillips <86920+dusty-phillips@users.noreply.github.com>
 Eric Paulson <Paulson.Eric@Gmail.com>
 James Stout <james.wolf.stout@gmail.com>
