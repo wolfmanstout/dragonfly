@@ -29,6 +29,7 @@ Detecting sleep mode
 
 """
 
+import os
 import os.path
 import pywintypes
 import sys
@@ -39,11 +40,13 @@ from threading import Thread, Event
 
 from six import text_type, binary_type, string_types, PY2
 
-from ..base        import EngineBase, EngineError, MimicFailure
+from ..base        import (EngineBase, EngineError, MimicFailure,
+                           GrammarWrapperBase)
+from .compiler     import NatlinkCompiler
 from .dictation    import NatlinkDictationContainer
 from .recobs       import NatlinkRecObsManager
 from .timer        import NatlinkTimerManager
-from .compiler     import NatlinkCompiler
+import dragonfly.grammar.elements as elements_
 import dragonfly.grammar.state as state_
 
 
@@ -122,7 +125,8 @@ class NatlinkEngine(EngineBase):
             import natlink
         except ImportError:
             self._log.error("%s: failed to import natlink module." % self)
-            raise EngineError("Requested engine 'natlink' is not available: Natlink is not installed.")
+            raise EngineError("Requested engine 'natlink' is not "
+                              "available: Natlink is not installed.")
         self.natlink = natlink
 
         self._grammar_count = 0
@@ -164,11 +168,12 @@ class NatlinkEngine(EngineBase):
         for grammar in self.grammars:
             grammar.unload()
 
-        # Close the the waitForSpeech() dialog box if it is active.
+        # Close the the waitForSpeech() dialog box if it is active for this
+        # process.
         from dragonfly import Window
         target_title = "Natlink / Python Subsystem"
         for window in Window.get_matching_windows(title=target_title):
-            if window.is_visible:
+            if window.is_visible and window.pid == os.getpid():
                 try:
                     window.close()
                 except pywintypes.error:
@@ -293,6 +298,8 @@ class NatlinkEngine(EngineBase):
         grammar_object.emptyList(n)
         [f(n, word) for word in lst.get_list_items()]
 
+        # Clear grammar wrapper word sets so they get recalculated.
+        wrapper.rule_words_map.clear()
 
     #-----------------------------------------------------------------------
     # Miscellaneous methods.
@@ -349,6 +356,9 @@ class NatlinkEngine(EngineBase):
         # Lookup and return the language tag.
         return self._get_language_tag(language)
 
+    def _has_quoted_words_support(self):
+        return True
+
     def set_retain_directory(self, retain_dir):
         """
         Set the directory where audio data is saved.
@@ -393,55 +403,67 @@ class NatlinkEngine(EngineBase):
 #---------------------------------------------------------------------------
 
 
-class GrammarWrapper(object):
+class GrammarWrapper(GrammarWrapperBase):
 
-    def __init__(self, grammar, grammar_object, engine, observer_manager):
-        self.grammar = grammar
+    def __init__(self, grammar, grammar_object, engine, recobs_manager):
+        GrammarWrapperBase.__init__(self, grammar, engine, recobs_manager)
         self.grammar_object = grammar_object
-        self.engine = engine
-        self.observer_manager = observer_manager
+        self.rule_words_map = {}
+
+    def get_rule_words(self, rule):
+        # Return a set containing any words used in this rule or in any
+        #  referenced rules or lists. Store the set for each rule as an
+        #  optimization.
+        if rule.name in self.rule_words_map:
+            return self.rule_words_map[rule.name]
+
+        words = set()
+        for element in self.grammar._get_element_list(rule):
+            if isinstance(element, elements_.Literal):
+                # Only get the required first word.
+                literal_words = element.words_ext
+                if literal_words:
+                    words.add(literal_words[0])
+            elif isinstance(element, elements_.RuleRef):
+                words.update(self.get_rule_words(element.rule))
+            elif isinstance(element, elements_.ListRef):
+                for string in element.list_.get_list_items():
+                    # Only get the required first word.
+                    list_item_words = string.split()
+                    if list_item_words:
+                        words.add(list_item_words[0])
+
+        self.rule_words_map[rule.name] = words
+        return words
 
     def begin_callback(self, module_info):
         executable, title, handle = tuple(map_word(word)
                                           for word in module_info)
         self.grammar.process_begin(executable, title, handle)
 
-    def results_callback(self, words, results):
-        NatlinkEngine._log.debug("Grammar %s: received recognition %r."
-                                 % (self.grammar._name, words))
-
-        if words == "other":
-            func = getattr(self.grammar, "process_recognition_other", None)
-            if func:
-                words = tuple(map_word(w)
-                              for w in results.getWords(0))
-                func(words)
-            return
-        elif words == "reject":
-            func = getattr(self.grammar, "process_recognition_failure", None)
-            if func:
-                func()
-            return
-
-        # If the words argument was not "other" or "reject", then
-        #  it is a sequence of (word, rule_id) 2-tuples.  Convert this
-        #  into a tuple of unicode objects.
-
-        words_rules = tuple((map_word(w), r) for w, r in words)
-        words = tuple(w for w, r in words_rules)
-
-        # Call the grammar's general process_recognition method, if present.
-        func = getattr(self.grammar, "process_recognition", None)
-        if func:
-            if not func(words):
-                return
-
+    def _process_rules(self, words, words_rules, results,
+                       manual_rule_ids):
         # Iterates through this grammar's rules, attempting
         #  to decode each.  If successful, call that rule's
         #  method for processing the recognition and return.
-        s = state_.State(words_rules, self.grammar._rule_names, self.engine)
+        s = state_.State(words_rules, self.grammar._rule_names,
+                         self.engine)
         for r in self.grammar._rules:
             if not (r.active and r.exported): continue
+
+            # Set dictation words manually if DNS didn't report a difference
+            #  between command and dictation words. A word is set as
+            #  dictation if it isn't a reported DNS dictation word and isn't
+            #  a word in the current top-level rule or any referenced rules.
+            if manual_rule_ids:
+                rule_words = self.get_rule_words(r)
+                words_rules2 = tuple(
+                    (w, 1000000) if r < 1000000 and w not in rule_words
+                    else (w, r)
+                    for w, r in words_rules
+                )
+                s = state_.State(words_rules2, self.grammar._rule_names,
+                                 self.engine)
             s.initialize_decoding()
             for result in r.decode(s):
                 if s.finished():
@@ -450,15 +472,62 @@ class GrammarWrapper(object):
 
                     # Notify observers using the manager *before*
                     # processing.
-                    self.observer_manager.notify_recognition(words, r, root)
+                    notify_args = (words, r, root, results)
+                    self.recobs_manager.notify_recognition(*notify_args)
 
                     r.process_recognition(root)
 
                     # Notify observers using the manager *after*
                     # processing.
-                    self.observer_manager.notify_post_recognition(words, r, root)
-                    return
+                    self.recobs_manager.notify_post_recognition(
+                        *notify_args
+                    )
+                    return True
 
+        return False
+
+    def results_callback(self, words, results):
+        NatlinkEngine._log.debug("Grammar %s: received recognition %r."
+                                 % (self.grammar._name, words))
+
+        if words == "other":
+            func = getattr(self.grammar, "process_recognition_other", None)
+            self._process_grammar_callback(
+                func, words=tuple(map_word(w) for w in results.getWords(0)),
+                results=results
+            )
+            return
+        elif words == "reject":
+            func = getattr(self.grammar, "process_recognition_failure",
+                           None)
+            self._process_grammar_callback(func, results=results)
+            return
+
+        # If the words argument was not "other" or "reject", then
+        #  it is a sequence of (word, rule_id) 2-tuples.  Convert this
+        #  into a tuple of unicode objects.
+        words_rules = tuple((map_word(w), r) for w, r in words)
+        words = tuple(w for w, r in words_rules)
+
+        # Call the grammar's general process_recognition method, if present.
+        func = getattr(self.grammar, "process_recognition", None)
+        if func:
+            if not self._process_grammar_callback(func, words=words,
+                                                  results=results):
+                # Return early if the method didn't return True or equiv.
+                return
+
+        # Attempt to decode each grammar rule and process the recognition if
+        #  successful.
+        if self._process_rules(words, words_rules, results, False):
+            return
+
+        # Try again. This time try to set words as dictation words where
+        #  appropriate.
+        if self._process_rules(words, words_rules, results, True):
+            return
+
+        # Failed to decode recognition.
         NatlinkEngine._log.warning("Grammar %s: failed to decode"
                                    " recognition %r."
                                    % (self.grammar._name, words))
@@ -484,9 +553,9 @@ class GrammarWrapper(object):
                     with open(wav_path, "wb") as f:
                         f.write(audio)
 
-                    # Write metadata
+                    # Write metadata, assuming 11025Hz 16bit mono audio
                     text = ' '.join(words)
-                    audio_length = float(len(audio) / 2) / 11025  # assumes 11025Hz 16bit mono
+                    audio_length = float(len(audio) / 2) / 11025
                     tsv_path = os.path.join(retain_dir, "retain.tsv")
                     with open(tsv_path, "a") as tsv_file:
                         tsv_file.write('\t'.join([

@@ -44,7 +44,9 @@ from ctypes.wintypes import DWORD, HANDLE, HWND, LONG
 
 from ..base                    import (EngineBase, EngineError,
                                        MimicFailure, DelegateTimerManager,
-                                       DelegateTimerManagerInterface, DictationContainerBase)
+                                       DelegateTimerManagerInterface,
+                                       DictationContainerBase,
+                                       GrammarWrapperBase)
 from .compiler                 import Sapi5Compiler
 from .recobs                   import Sapi5RecObsManager
 from ...grammar.state          import State
@@ -299,35 +301,15 @@ class Sapi5SharedEngine(EngineBase, DelegateTimerManagerInterface):
         else:
             return "en"
 
-    def process_grammars_context(self, window=None):
-        """
-            Enable/disable grammars & rules based on their current contexts.
-
-            This must be done preemptively because WSR doesn't allow doing it
-            upon/after the utterance start has been detected. The engine
-            should call this automatically whenever the foreground application
-            (or its title) changes. But the user may want to call this
-            manually to update when custom contexts.
-
-            The *window* parameter is optional window information, which can
-            be passed in as an optimization if it has already been gathered.
-
-        """
-
-        if window is None: window = Window.get_foreground()
-        for grammar in self.grammars:
-            # Prevent 'notify_begin()' from being called.
-            if grammar.name == "_recobs_grammar":
-                continue
-            grammar.process_begin(window.executable, window.title,
-                                  window.handle)
+    def _has_quoted_words_support(self):
+        return False
 
     def _do_recognition(self):
         """
             Recognize speech in a loop.
 
-            This will also call any scheduled timer functions and ensure that
-            the correct window context is used.
+            This will also call any scheduled timer functions and ensure
+            that the correct window context is used.
 
         """
 
@@ -476,14 +458,12 @@ def collection_iter(collection):
 
 #---------------------------------------------------------------------------
 
-class GrammarWrapper(object):
+class GrammarWrapper(GrammarWrapperBase):
 
     def __init__(self, grammar, handle, context, engine, recobs_manager):
-        self.grammar = grammar
+        GrammarWrapperBase.__init__(self, grammar, engine, recobs_manager)
         self.handle = handle
-        self.engine = engine
         self.context = context
-        self.recobs_manager = recobs_manager
         self.state_before_exclusive = handle.State
 
         # Register callback functions which will handle recognizer events.
@@ -502,7 +482,8 @@ class GrammarWrapper(object):
         self.grammar.process_begin(window.executable, window.title,
                                    window.handle)
 
-    def recognition_callback(self, StreamNumber, StreamPosition, RecognitionType, Result):
+    def recognition_callback(self, StreamNumber, StreamPosition,
+                             RecognitionType, Result):
         try:
             newResult = Dispatch(Result)
             phrase_info = newResult.PhraseInfo
@@ -613,7 +594,8 @@ class GrammarWrapper(object):
             func = getattr(self.grammar, "process_recognition", None)
             words = tuple([r[0] for r in results])
             if func:
-                if not func(words):
+                if not self._process_grammar_callback(func, words=words,
+                                                      results=newResult):
                     return
 
             s = State(results, rule_set, self.engine)
@@ -627,9 +609,12 @@ class GrammarWrapper(object):
                         # Notify recognition observers, then process the
                         # rule.
                         root = s.build_parse_tree()
-                        self.recobs_manager.notify_recognition(words, r, root)
+                        notify_args = (words, r, root, newResult)
+                        self.recobs_manager.notify_recognition(*notify_args)
                         r.process_recognition(root)
-                        self.recobs_manager.notify_post_recognition(words, r, root)
+                        self.recobs_manager.notify_post_recognition(
+                            *notify_args
+                        )
                         return
 
         except Exception as e:
@@ -646,16 +631,13 @@ class GrammarWrapper(object):
                                   [r[0] for r in results]))
 
     def recognition_other_callback(self, StreamNumber, StreamPosition):
+        # Note that SAPI 5.3 doesn't offer access to the actual
+        #  recognition contents during a
+        #  OnRecognitionForOtherContext event.
         func = getattr(self.grammar, "process_recognition_other", None)
-        if func:
-            # Note that SAPI 5.3 doesn't offer access to the actual
-            #  recognition contents during a
-            #  OnRecognitionForOtherContext event.
-            func(words=False)
-        return
+        self._process_grammar_callback(func, words=False, results=None)
 
-    def recognition_failure_callback(self, StreamNumber, StreamPosition, Result):
+    def recognition_failure_callback(self, StreamNumber, StreamPosition,
+                                     Result):
         func = getattr(self.grammar, "process_recognition_failure", None)
-        if func:
-            func()
-        return
+        self._process_grammar_callback(func, results=Dispatch(Result))
