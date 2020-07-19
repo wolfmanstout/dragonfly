@@ -108,7 +108,7 @@ How can I use older Dragonfly scripts with Dragonfly2?
 Older dragonfly scripts are mostly written with Python 2.x in mind. Python
 version 2.7 has reached the end of its life as of January 2020 (see
 `Python 2.7 EOL`_). For complicated reasons, Dragonfly's Python 3.x support
-has come a bit later than most other actively projects. You will need to
+has come a bit later than most other active projects. You will need to
 convert older Python 2.x code, to use it with Python 3.x. There are a few
 ways to convert older code:
 
@@ -258,6 +258,48 @@ If threads still aren't working properly for you, please see the
 :ref:`RefFAQUnansweredQuestions` section.
 
 
+How do I fix "failed to decode recognition" errors?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+"Failed to decode recognition" is the error message displayed when Dragonfly
+is unable to match what was said to a grammar rule. This can occur when
+saying command words to match a dictation part of a rule.
+
+One way around this to add a top-level grammar rule for dictating other
+words in your rules:
+
+.. code-block:: python
+
+   from dragonfly import Dictation, Text
+
+   mapping = {
+       "reserved (word|words) <text>": Text("%(text)s")
+   }
+
+   extras = [
+       Dictation("text")
+   ]
+
+
+Another way around the problem is to have an "extra" for reserved words:
+
+.. code-block:: python
+
+   from dragonfly import Choice, Text
+
+   mapping = {
+       "type <reserved>": Text("%(reserved)s")
+   }
+
+   extras = [
+       Choice("reserved", {
+           "alpha": "alpha",
+           "bravo": "bravo",
+           "charlie": "charlie",
+       })
+   ]
+
+
 How do I use an "extra" in a Dragonfly spec multiple times?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -331,6 +373,73 @@ it:
 
 See the :ref:`Function action's documentation <RefFunctionAction>`
 for more information and code examples.
+
+
+Is there a way to recognize negative integers with Dragonfly?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Yes. The simplest way of recognizing negative integers is to use
+:class:`IntegerRef` and :class:`Modifier` elements together in a command
+with an appropriate prefix word such as "negative" or "minus":
+
+.. code-block:: python
+
+   from dragonfly import IntegerRef, Modifier, Text
+
+   # Define a MappingRule command for typing a negative integer.
+   mapping = {
+       "(minus|negative) <n>": Text("%(n)d"),
+   }
+
+   # The special Modifier element lets us modify the value of an element.
+   # Here we use it to specify the "n" extra as a negated integer between 1
+   # and 50.
+   extras = [
+       Modifier(IntegerRef("n", 1, 50), lambda n: n*-1)
+   ]
+
+
+Is there a way to construct Dragonfly grammars manually with elements?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Yes. The :class:`dragonfly.grammar.rule_basic.BasicRule` is the rule class
+to use for constructing Dragonfly rules and grammars manually with elements
+instead of with compound specs and extras.
+
+The following is an example of how to use :class:`BasicRule` and common
+Dragonfly element and action classes together:
+
+.. code-block:: python
+
+   from dragonfly import (BasicRule, Repetition, Alternative, Literal, Text,
+                          Grammar)
+
+   class ExampleRule(BasicRule):
+       # Define a rule element that accepts 1 to 5 (exclusive) repetitions
+       # of either 'test one', 'test two' or 'test three'. These commands
+       # type their respective numbers in succession using the Text action.
+       element = Repetition(
+           Alternative((
+               Literal("test one", value=Text("1")),
+               Literal("test two", value=Text("2")),
+               Literal("test three", value=Text("3")),
+           )),
+           1, 5
+       )
+
+   # Create a grammar with the example rule and load it.
+   rule = ExampleRule()
+   grammar = Grammar("BasicRule Example")
+   grammar.add_rule(rule)
+   grammar.load()
+
+
+Please note that extras in action specification strings (e.g. *n* in
+:code:`Key("left:%(n)d")`) will **not** work for the :class:`BasicRule`
+class. For this functionality, you should use :class:`CompoundRule` or
+:class:`MappingRule` instead. You can also override the
+:meth:`_process_recognition` method and use the :code:`node` object to
+retrieve the desired extra / element and its value.
 
 
 Why aren't Dragonfly's input actions working on my Linux system?
