@@ -277,14 +277,15 @@ class Sequence(ElementBase):
         the recognition in the order that they were given in the
         *children* constructor argument.
 
-        Example usage:
-        >>> from dragonfly.test import ElementTester
-        >>> seq = Sequence([Literal("hello"), Literal("world")])
-        >>> test_seq = ElementTester(seq)
-        >>> test_seq.recognize("hello world")
-        ['hello', 'world']
-        >>> test_seq.recognize("hello universe")
-        RecognitionFailure
+        Example usage::
+
+           >>> from dragonfly.test import ElementTester
+           >>> seq = Sequence([Literal("hello"), Literal("world")])
+           >>> test_seq = ElementTester(seq)
+           >>> test_seq.recognize("hello world")
+           ['hello', 'world']
+           >>> test_seq.recognize("hello universe")
+           RecognitionFailure
 
     """
 
@@ -600,7 +601,7 @@ class Repetition(Sequence):
                             " ElementBase instance." % self)
         assert isinstance(min, integer_types)
         assert max is None or isinstance(max, integer_types)
-        assert max is None or min < max
+        assert max is None or min < max, "min must be less than max"
 
         self._child = child
         self._min = min
@@ -611,7 +612,7 @@ class Repetition(Sequence):
         optional_length = self._max - self._min - 1
         if optional_length > 0:
             element = Optional(child)
-            for index in range(optional_length):
+            for index in range(optional_length-1):
                 element = Optional(Sequence([child, element]))
 
             if self._min >= 1:

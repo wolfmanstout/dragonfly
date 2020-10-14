@@ -1,6 +1,6 @@
 .. _RefSphinxEngine:
 
-CMU Pocket Sphinx dragonfly engine
+CMU Pocket Sphinx engine back-end
 ============================================================================
 
 This version of dragonfly contains an engine implementation using the open
@@ -20,11 +20,11 @@ There are three Pocket Sphinx engine dependencies:
 
 You can install these by running the following command::
 
-  pip install dragonfly2[sphinx]
+  pip install 'dragonfly2[sphinx]'
 
 If you are installing to *develop* dragonfly, use the following instead::
 
-  pip install -e .[sphinx]
+  pip install -e '.[sphinx]'
 
 Once the dependencies are installed, you'll need to copy the
 `dragonfly/examples/sphinx_module_loader.py`_ script into the folder
@@ -211,6 +211,9 @@ Engine API
 ----------------------------------------------------------------------------
 
 .. autoclass:: dragonfly.engines.backend_sphinx.engine.SphinxEngine
+   :members:
+
+.. automodule:: dragonfly.engines.backend_sphinx.timer
    :members:
 
 
