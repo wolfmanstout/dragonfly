@@ -11,18 +11,93 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
-Unreleased_
------------
+0.27.1_ - 2020-09-18
+--------------------
+
+Changed
+~~~~~~~
+* Add missing debug logging for the FuncContext class (thanks `@Timoses`_).
+
+Fixed
+~~~~~
+* Fix two bugs with the Monitor class for X11 (Linux).
+
+
+0.27.0_ - 2020-09-09
+--------------------
+
+Added
+~~~~~
+* Add Kaldi support for special user-modifiable Dictation elements (thanks
+  `@daanzu`_).
+
+Changed
+~~~~~~~
+* Bump required KaldiAG version to 1.8.0 for various improvements. See
+  `KaldiAG release notes`_ (thanks `@daanzu`_).
+* Change X11Window.maximize() method to use Extended Window Manager Hints
+  instead of a hardcoded shortcut.
+* Add the *wmctrl* command-line program as a **new required X11 session
+  dependency** for properly maximizing X11 windows via maximization hints.
+* Improve Kaldi engine error messages for failed compilation (thanks
+  `@daanzu`_).
+* Reorganize, fix and improve various parts of the documentation.
+
+Fixed
+~~~~~
+* Fix Repetition element so the *max* argument is an exclusive bound (thanks
+  `@starwarswii`_).
+* Fix Windows bug where the printscreen key cannot be pressed.
+
+
+0.26.0_ - 2020-08-08
+--------------------
+
+Added
+~~~~~
+* Add useful audio-related initialization arguments to Kaldi engine back-end
+  (thanks `@daanzu`_).
+
+Changed
+~~~~~~~
+* Bump required Kaldi-Active-Grammar version to 1.7.0 fix bugs.
+* Change the get_engine() function to stop overriding the default (first)
+  engine if another engine is initialized.
+
+Fixed
+~~~~~
+* Add missing high numbers to short integer elements (thanks `@mrob95`_).
+* Fix Python 2.7 bug where StartApp action args may only use ASCII
+  characters.
+* Fix bug with BasicRule where it can only be used as a derived class.
+* Fix various Kaldi engine bugs and documentation issues (thanks
+  `@daanzu`_).
+
+
+0.25.1_ - 2020-07-29
+--------------------
+
+Fixed
+~~~~~
+* Fix Kaldi & Sphinx recognition delays on macOS by optimizing window
+  attribute checks in those engine back-ends.
+
+
+0.25.0_ - 2020-07-20
+--------------------
 
 Added
 ~~~~~
 * Add BasicRule class for defining commands using elements directly.
+* Add Kaldi engine support for recognition confidence information, plus
+  various new engine arguments (thanks `@daanzu`_).
+* Add convenience method Window.matches(context) (thanks `@daanzu`_).
 
 Changed
 ~~~~~~~
 * Move SAPI 5 engine process_grammars_context() method into the EngineBase
   class.
-* Update required version for lark-parser dependency latest version.
+* Update required versions for lark-parser and KaldiAG version.
 
 Fixed
 ~~~~~
@@ -33,6 +108,7 @@ Fixed
 * Fix CLI error reporting and file pattern matching issues.
 * Fix bug causing Win32Window.set_foreground() to fail sometimes.
 * Fix bug in the NatlinkEngine.disconnect() method.
+* Fix some Kaldi engine bugs.
 
 Removed
 ~~~~~~~
@@ -914,7 +990,12 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.24.0...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.27.1...HEAD
+.. _0.27.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.27.0...0.27.1
+.. _0.27.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.26.0...0.27.0
+.. _0.26.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.25.1...0.26.0
+.. _0.25.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.25.0...0.25.1
+.. _0.25.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.24.0...0.25.0
 .. _0.24.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.23.2...0.24.0
 .. _0.23.2:      https://github.com/dictation-toolbox/dragonfly/compare/0.23.1...0.23.2
 .. _0.23.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.23.0...0.23.1
@@ -953,6 +1034,7 @@ This release is the first in the Git version control system.
 .. Contributors.
 .. _@JasoonS: https://github.com/JasoonS
 .. _@LexiconCode: https://github.com/LexiconCode
+.. _@Timoses: https://github.com/Timoses
 .. _@Versatilus: https://github.com/Versatilus
 .. _@alexboche: https://github.com/alexboche
 .. _@calmofthestorm: https://github.com/calmofthestorm
@@ -965,15 +1047,17 @@ This release is the first in the Git version control system.
 .. _@lexxish: https://github.com/lexxish
 .. _@mrob95: https://github.com/mrob95
 .. _@shervinemami: https://github.com/shervinemami
+.. _@starwarswii: https://github.com/starwarswii
 .. _@thatch: https://github.com/thatch
 .. _@tylercal: https://github.com/tylercal
 .. _@wolfmanstout: https://github.com/wolfmanstout
 
 .. Other links.
-.. _Keep a Changelog: https://keepachangelog.com/en/1.0.0/
-.. _reStructuredText format: http://docutils.sourceforge.net/rst.html
-.. _Semantic Versioning: http://semver.org/spec/v2.0.0.html
 .. _Aenea: https://github.com/dictation-toolbox/aenea
-.. _pynput: https://github.com/moses-palmer/pynput
 .. _Kaldi engine: https://dragonfly2.readthedocs.io/en/latest/kaldi_engine.html
+.. _KaldiAG release notes: https://github.com/daanzu/kaldi-active-grammar/releases
+.. _Keep a Changelog: https://keepachangelog.com/en/1.0.0/
 .. _Lark-based: https://github.com/lark-parser/lark
+.. _Semantic Versioning: http://semver.org/spec/v2.0.0.html
+.. _pynput: https://github.com/moses-palmer/pynput
+.. _reStructuredText format: http://docutils.sourceforge.net/rst.html

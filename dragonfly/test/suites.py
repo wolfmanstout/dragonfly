@@ -38,6 +38,7 @@ common_names = [
     "test_accessibility",
     "test_actions",
     "test_contexts",
+    "test_basic_rule",
     "test_engine_nonexistent",
     "test_log",
     "test_parser",
@@ -134,6 +135,11 @@ engine_tests_dict['sapi5inproc'] = engine_tests_dict['sapi5']
 engine_tests_dict['sapi5shared'] = engine_tests_dict['sapi5']
 
 
+engine_params_dict = {
+    "kaldi": dict(audio_input_device=False),
+}
+
+
 # ==========================================================================
 
 
@@ -149,7 +155,8 @@ def run_pytest_suite(engine_name, pytest_options):
         paths.append(name)
 
     # Initialize the engine and call connect().
-    engine = get_engine(engine_name)
+    engine_params = engine_params_dict.get(engine_name, {})
+    engine = get_engine(engine_name, **engine_params)
     engine.connect()
 
     # Prevent the engine from running timers on its own. This lets us

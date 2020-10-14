@@ -149,11 +149,12 @@ replace :code:`dragonfly` with :code:`dragonfly2` or remove lines like this
 altogether.
 
 If you are installing this on Linux, you will also need to install the
-`xdotool <https://www.semicomplete.com/projects/xdotool/>`__ program for the
-``Key`` and ``Text`` actions to work. Please note that Dragonfly is only
-fully functional in an X11 session. Input action classes, application
-contexts and the ``Window`` class will **not** be functional under Wayland.
-It is recommended that Wayland users switch to X11.
+`xdotool <https://www.semicomplete.com/projects/xdotool/>`__ and `wmctrl
+<https://www.freedesktop.org/wiki/Software/wmctrl/>`__ programs. Please note
+that Dragonfly is only fully functional in an X11 session. Input action
+classes, application contexts and the ``Window`` class will **not** be
+functional under Wayland. It is recommended that Wayland users switch to
+X11.
 
 If you have dragonfly installed under the original *dragonfly*
 distribution name, you'll need to remove the old version using:
@@ -172,16 +173,31 @@ directory:
 
     python setup.py install
 
-To use the CMU Pocket Sphinx engine, see the `relevant documentation
-page <http://dragonfly2.readthedocs.org/en/latest/sphinx_engine.html>`__
-on it.
-
 If pip fails to install *dragonfly2* or any of its required or extra
 dependencies, then you may need to upgrade pip with the following command:
 
 .. code:: shell
 
     pip install --upgrade pip
+
+
+SR engine back-ends
+----------------------------------------------------------------------------
+
+Each Dragonfly speech recognition engine back-end and its requirements are
+documented separately:
+
+* `Natlink and DNS engine
+  <http://dragonfly2.readthedocs.org/en/latest/natlink_engine.html>`_
+* `SAPI 5 and WSR engine
+  <http://dragonfly2.readthedocs.org/en/latest/sapi5_engine.html>`_
+* `Kaldi engine
+  <http://dragonfly2.readthedocs.org/en/latest/kaldi_engine.html>`_
+* `CMU Pocket Sphinx engine
+  <http://dragonfly2.readthedocs.org/en/latest/sphinx_engine.html>`_
+* `Text-input engine
+  <http://dragonfly2.readthedocs.org/en/latest/text_engine.html>`_
+
 
 Existing command modules
 ----------------------------------------------------------------------------
@@ -198,4 +214,4 @@ which lists various sources.
 .. |Join Gitter chat| image:: https://badges.gitter.im/Join%20Chat.svg
    :target: https://gitter.im/dictation-toolbox/dragonfly
 .. |Join Matrix chat| image:: https://img.shields.io/matrix/dragonfly2:matrix.org.svg?label=%5Bmatrix%5D
-   :target: https://riot.im/app/#/room/#dragonfly2:matrix.org
+   :target: https://app.element.io/#/room/#dragonfly2:matrix.org
