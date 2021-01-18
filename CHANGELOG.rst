@@ -11,6 +11,52 @@ Note: this project had no release versions between 0.6.6b1_ and
 0.7.0_. Notable changes made between these versions are documented in the
 commit history and will be placed under headings in this file over time.
 
+
+0.29.0_ - 2020-12-31
+--------------------
+
+Changed
+~~~~~~~
+* Add _functions_example.py example command module (thanks `@LexiconCode`_).
+* Add smart type casting to CLI loader engine parameter options (thanks
+  `@daanzu`_).
+* Improve error message when X11 can't be detected (thanks `@dasnessie`_)
+
+Fixed
+~~~~~
+* Fix Kaldi grammar loading/unloading while in phrase (thanks `@daanzu`_).
+* Fix recognition observer bug with the KaldiEngine.mimic() method.
+
+
+0.28.1_ - 2020-11-15
+--------------------
+
+Fixed
+~~~~~
+* Fix DNS dictation bug where formatting can be applied incorrectly.
+
+
+0.28.0_ - 2020-10-24
+--------------------
+
+Changed
+~~~~~~~
+* Add methods for setting Rule and Grammar contexts after instantiation
+  (thanks `@Timoses`_).
+* Add warning messages on adding the same exported rule to multiple grammars.
+* Change default values for Kaldi vad_padding_end_ms and
+  vad_complex_padding_end_ms engine config arguments (thanks `@daanzu`_).
+* Set DPI awareness automatically when dragonfly is imported (Windows only)
+  (thanks `@wolfmanstout`_).
+
+Fixed
+~~~~~
+* Add missing Grammar.remove_list() method.
+* Add missing validation and type checks into the ContextAction class.
+* Fix SAPI5 engine processing issues with window title context changes.
+* Fix various Kaldi engine bugs and other issues (thanks `@daanzu`_).
+
+
 0.27.1_ - 2020-09-18
 --------------------
 
@@ -990,7 +1036,10 @@ This release is the first in the Git version control system.
 
 
 .. Release links.
-.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.27.1...HEAD
+.. _Unreleased:  https://github.com/dictation-toolbox/dragonfly/compare/0.29.0...HEAD
+.. _0.29.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.28.1...0.29.0
+.. _0.28.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.28.0...0.28.1
+.. _0.28.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.27.1...0.28.0
 .. _0.27.1:      https://github.com/dictation-toolbox/dragonfly/compare/0.27.0...0.27.1
 .. _0.27.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.26.0...0.27.0
 .. _0.26.0:      https://github.com/dictation-toolbox/dragonfly/compare/0.25.1...0.26.0
@@ -1041,6 +1090,7 @@ This release is the first in the Git version control system.
 .. _@caspark: https://github.com/caspark
 .. _@comodoro: https://github.com/comodoro
 .. _@daanzu: https://github.com/daanzu
+.. _@dasnessie: https://github.com/dasnessie
 .. _@dmakarov: https://github.com/dmakarov
 .. _@dusty-phillips: https://github.com/dusty-phillips
 .. _@kb100: https://github.com/kb100

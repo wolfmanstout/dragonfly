@@ -618,8 +618,16 @@ get the following error if you are using `Wayland`_ or something else::
 
   NotImplementedError: Keyboard support is not implemented for this platform!
 
-If you see this message, then you will either need to `switch to X11`_ or
+If you see this message, then you will probably need to `switch to X11`_ or
 use something like `ydotool`_ to have keyboard/mouse input work properly.
+
+If you are using X11 and still see this message, then the
+:code:`XDG_SESSION_TYPE` environment variable checked by Dragonfly
+internally is not set to :code:`x11`. This can happen in some circumstances
+and can be fixed by setting the variable manually, e.g. in your
+:code:`~/.profile` file::
+
+  export XDG_SESSION_TYPE=x11
 
 
 .. _RefFAQUnansweredQuestions:
@@ -652,7 +660,7 @@ touch:
 .. _Dragonfly mailing list: https://groups.google.com/forum/#!forum/dragonflyspeech
 .. _Gitter Channel: https://gitter.im/dictation-toolbox/dragonfly
 .. _High DPI Desktop Application Development on Windows: https://docs.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows
-.. _Matrix channel: https://app.element.io/#/room/#dragonfly2:matrix.org
+.. _Matrix channel: https://app.element.io/#/room/#dictation-toolbox_dragonfly:gitter.im
 .. _Natlink Troubleshooting page: https://qh.antenna.nl/unimacro/installation/problemswithinstallation.html
 .. _Python 2-3 code porting guide: https://docs.python.org/3/howto/pyporting.html
 .. _Python 2.7 EOL: https://www.python.org/dev/peps/pep-0373/

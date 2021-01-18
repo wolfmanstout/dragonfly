@@ -22,7 +22,7 @@
 Kaldi engine classes
 """
 
-import collections, logging, os, subprocess, sys, threading, time
+import collections, functools, logging, os, sys, time
 
 from packaging.version import Version
 from six import PY2, integer_types, string_types, print_, reraise
@@ -69,7 +69,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
     def __init__(self, model_dir=None, tmp_dir=None, input_device_index=None,
         audio_input_device=None, audio_self_threaded=True, audio_auto_reconnect=True, audio_reconnect_callback=None,
         retain_dir=None, retain_audio=None, retain_metadata=None, retain_approval_func=None,
-        vad_aggressiveness=3, vad_padding_start_ms=150, vad_padding_end_ms=150, vad_complex_padding_end_ms=500,
+        vad_aggressiveness=3, vad_padding_start_ms=150, vad_padding_end_ms=200, vad_complex_padding_end_ms=600,
         auto_add_to_user_lexicon=True, lazy_compilation=True, invalidate_cache=False,
         expected_error_rate_threshold=None,
         alternative_dictation=None, cloud_dictation_lang='en-US',
@@ -156,6 +156,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
         self._audio_iter = None
         self.audio_store = None
 
+        self._loadunload_queue = collections.deque()
         self._any_exclusive_grammars = False
         self._saving_adaptation_state = False
         self._ignore_current_phrase = False
@@ -213,6 +214,8 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
         else:
             if self._audio:
                 self._audio.destroy()
+            if self.audio_store:
+                self.audio_store.save_all()
             self._reset_state()
             self._grammar_wrappers = {}  # From EngineBase
 
@@ -224,24 +227,35 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
 
     def _load_grammar(self, grammar):
         """ Load the given *grammar*. """
-        self._log.info("Loading grammar %s" % grammar.name)
         if not self._decoder:
             self.connect()
 
+        self._log.info("Loading grammar %s" % grammar.name)
         kaldi_rule_by_rule_dict = self._compiler.compile_grammar(grammar, self)
         wrapper = GrammarWrapper(grammar, kaldi_rule_by_rule_dict, self,
                                  self._recognition_observer_manager)
-        for (rule, kaldi_rule) in kaldi_rule_by_rule_dict.items():
-            kaldi_rule.active = bool(rule.active)  # Initialize to correct activity
-            kaldi_rule.load(lazy=self._compiler.lazy_compilation)
+
+        def load():
+            for (rule, kaldi_rule) in kaldi_rule_by_rule_dict.items():
+                kaldi_rule.active = bool(rule.active)  # Initialize to correct activity
+                kaldi_rule.load(lazy=self._compiler.lazy_compilation)
+        if self._in_phrase:
+            self._loadunload_queue.append(load)
+        else:
+            load()
 
         return wrapper
 
     def _unload_grammar(self, grammar, wrapper):
         """ Unload the given *grammar*. """
         self._log.debug("Unloading grammar %s." % grammar.name)
-        rules = list(wrapper.kaldi_rule_by_rule_dict.keys())
-        self._compiler.unload_grammar(grammar, rules, self)
+        def unload():
+            rules = list(wrapper.kaldi_rule_by_rule_dict.keys())
+            self._compiler.unload_grammar(grammar, rules, self)
+        if self._in_phrase:
+            self._loadunload_queue.append(unload)
+        else:
+            unload()
 
     def activate_grammar(self, grammar):
         """ Activate the given *grammar*. """
@@ -291,6 +305,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
 
         recognition = self._parse_recognition(output, mimic=True)
         if not recognition.kaldi_rule:
+            recognition.fail()
             raise MimicFailure("No matching rule found for %r." % (output,))
         recognition.process()
         self._log.debug("End of mimic: rule %s, %r" % (recognition.kaldi_rule, output))
@@ -309,7 +324,13 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
 
     def prepare_for_recognition(self):
         """ Can be called optionally before ``do_recognition()`` to speed up its starting of active recognition. """
+        if self._in_phrase:
+            self._log.warning("prepare_for_recognition ignored while in phrase; will be run after")
+            return
         try:
+            while self._loadunload_queue:
+                operation = self._loadunload_queue.popleft()
+                operation()
             self._compiler.prepare_for_recognition()
         except KaldiError as e:
             if len(e.args) >= 2 and isinstance(e.args[1], KaldiRule):
@@ -328,14 +349,14 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
         if audio_iter is None and self._audio is None:
             raise EngineError("No audio input")
         self._doing_recognition = True
+        self._in_phrase = False
+        self._ignore_current_phrase = False
+        in_complex = False
+        end_time = None
+        timed_out = False
 
         try:
-            self.prepare_for_recognition()
-
-            self._in_phrase = False
-            self._ignore_current_phrase = False
-            in_complex = False
-            timed_out = False
+            self.prepare_for_recognition()  # Try to get compilation out of the way before starting audio
 
             if timeout != None:
                 end_time = time.time() + timeout
@@ -348,8 +369,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
             next(audio_iter)  # Prime the audio iterator
 
             # Loop until timeout (if set) or until disconnect() is called.
-            while (not self._deferred_disconnect) and ((not timeout) or (time.time() < end_time)):
-                self.prepare_for_recognition()
+            while (not self._deferred_disconnect) and ((not end_time) or (time.time() < end_time)):
                 block = audio_iter.send(in_complex)
 
                 if block is False:
@@ -412,6 +432,7 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
                     timed_out = False
                     if single:
                         break
+                    self.prepare_for_recognition()  # Do any of this leftover, now that phrase is done
 
                 self.call_timer_callback()
 
@@ -421,10 +442,13 @@ class KaldiEngine(EngineBase, DelegateTimerManagerInterface):
 
         finally:
             self._doing_recognition = False
-            if audio_iter == self._audio_iter and self._audio:
-                self._audio.stop()
-            if self.audio_store:
-                self.audio_store.save_all()
+            if (audio_iter == self._audio_iter) and self._audio:
+                try:
+                    self._audio.stop()  # We started the audio above, so we should stop it
+                except Exception:
+                    self._log.exception("Error stopping audio")
+            if self._deferred_disconnect:
+                self.disconnect()
 
         return not timed_out
 
